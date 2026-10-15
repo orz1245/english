@@ -5,6 +5,8 @@ export interface GrammarToken {
   role: string;
   roleCode: RoleCode;
   explanation: string;
+  /** 可选：覆盖该词段默认的批注下划线样式（内置语料与 AI 返回均可缺省） */
+  underlineStyle?: 'solid' | 'double' | 'dashed' | 'dotted';
 }
 
 export interface GrammarStep {
