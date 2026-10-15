@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Cloudflare Wrangler local state & secrets
+.wrangler/
+.dev.vars
+.env
+.env.*
+
+# Logs & OS files
+*.log
+.DS_Store

@@ -1,0 +1,35 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "linguaforge-english"
+main = "src/worker/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 静态资源配置（Vite 构建产物目录，由 Cloudflare Workers Static Assets 托管）
+[assets]
+directory = "./dist/client"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# ============================================================================
+# 持久化配置：支持 Cloudflare D1 数据库 与 Cloudflare KV 命名空间
+# Worker 后端内置自适应存储引擎：
+# 1. 若绑定了 DB (D1)，优先使用 D1 关系型表存储（支持自动建表）
+# 2. 若绑定了 STORAGE_KV (KV)，自动回退至 KV 存储
+# 3. 本地未配置绑定时，自动启用边缘内存持久化演示存储，开箱即用
+# ============================================================================
+
+[[d1_databases]]
+binding = "DB"
+database_name = "linguaforge-db"
+database_id = "00000000-0000-0000-0000-000000000000" # 部署生产环境前请替换为 `wrangler d1 create linguaforge-db` 生成的 ID
+
+# 如需使用 KV 替代 D1，可取消下方注释并填入 KV namespace id：
+# [[kv_namespaces]]
+# binding = "STORAGE_KV"
+# id = "00000000000000000000000000000000"
+
+[vars]
+# 可选服务端默认 AI 配置（当用户在前端未填写自定义 API Key 时作为兜底）
+DEFAULT_AI_BASE_URL = "https://api.openai.com/v1"
+DEFAULT_AI_MODEL = "gpt-4o-mini"
+# 建议通过 `wrangler secret put DEFAULT_AI_API_KEY` 设置默认密钥，不要将真实密钥硬编码在此处
