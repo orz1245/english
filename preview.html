@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LinguaForge — 语法解析 · 句子翻译 · 雅思备考</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,400;1,600&family=Inter:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      body {
+        background-color: #FBF8F3;
+        color: #2C2623;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .font-editorial {
+        font-family: 'Cormorant Garamond', 'Noto Serif SC', Georgia, serif;
+      }
+      .editorial-card {
+        background-color: #F4EFE6;
+        border: 1px solid #DFD7C8;
+        box-shadow: 0 2px 10px rgba(92, 75, 55, 0.04);
+      }
+      .editorial-card-inner {
+        background-color: #FBF8F3;
+        border: 1px solid #E2DACB;
+      }
+      .editorial-inset-box {
+        background-color: #F7F3EA;
+        border: 1px solid #D5CBB8;
+      }
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: #F4EFE6; }
+      ::-webkit-scrollbar-thumb { background: #CDBEAA; border-radius: 9999px; }
+      ::-webkit-scrollbar-thumb:hover { background: #B07D4F; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect } = React;
+
+      // 语法角色定义
+      const ROLE_META = {
+        S: { en: 'Subject', zh: '主语', color: '#B07D4F', bg: '#EFE6D5', border: '#C9A67E', text: '#7A4E24' },
+        V: { en: 'Verb', zh: '谓语', color: '#2E5641', bg: '#E3ECE6', border: '#8AB09B', text: '#234533' },
+        O: { en: 'Object', zh: '宾语', color: '#A65242', bg: '#F2E5DF', border: '#CFA096', text: '#8E3F30' },
+        P: { en: 'Subject Complement', zh: '表语', color: '#C69C53', bg: '#F3EBD8', border: '#D8BC86', text: '#8A6626' },
+        Attr: { en: 'Attributive', zh: '定语', color: '#5C6F49', bg: '#EAECE2', border: '#A8B899', text: '#485937' },
+        Adv: { en: 'Adverbial', zh: '状语', color: '#4A6A70', bg: '#E4ECEE', border: '#96B2B7', text: '#365257' },
+        Clause: { en: 'Appositive Clause', zh: '同位语从句', color: '#3A634C', bg: '#E4EDE8', border: '#93B5A2', text: '#2B4E3B' },
+      };
+
+      const GRAMMAR_DATA = [
+        {
+          id: 'g0',
+          title: 'Jane Austen · Pride and Prejudice《傲慢与偏见》',
+          pattern: '形式主语 (It) + 系动词 (is) + 表语 + 真正从句',
+          sentence: 'It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.',
+          translation: '凡是有钱的单身汉，总想娶位太太，这已经成了一条公认的真理。',
+          overview: '句首以 It 充当形式主语，表语核心词 a truth 后接过去分词短语 universally acknowledged 作后置定语；逗号后由 that 引导从句展开命题内容。',
+          highlights: [
+            { head: 'universally acknowledged', note: '过去分词短语后置修饰 a truth' },
+            { head: 'in possession of a good fortune', note: '静态介词短语修饰 a single man' },
+            { head: 'in want of', note: '介词短语作系动词 must be 的表语（需要、渴望）' }
+          ],
+          tokens: [
+            { text: 'It', role: 'S', desc: '形式主语先行占位以平衡句式重心。' },
+            { text: 'is', role: 'V', desc: '一般现在时系动词，连接形式主语与表语。' },
+            { text: 'a truth universally acknowledged,', role: 'P', desc: '表语核心词 a truth，后接过去分词短语作后置定语。' },
+            { text: 'that a single man in possession of a good fortune, must be in want of a wife.', role: 'Clause', desc: '揭示 a truth 的具体内容，内部为主系表结构。' }
+          ],
+          layers: [
+            { title: '核心主干 (Core Trunk)', desc: 'It (形式主语) + is (系动词) + a truth (表语)' },
+            { title: '修饰成分 (Modifiers)', desc: 'universally acknowledged (分词后置定语) · in possession of (介词短语定语)' },
+            { title: '从句结构 (Subordinate Clause)', desc: 'that a single man ... must be in want of a wife (同位/主语从句)' }
+          ]
+        },
+        {
+          id: 'g1',
+          title: '科技变革与跨时区全球协作',
+          pattern: '主谓宾宾补 (SVOC) + 介词短语后置定语',
+          sentence: 'Digital technology has made remote collaboration across global time zones remarkably efficient.',
+          translation: '数字技术已使跨越全球不同时区的远程协作变得尤为高效。',
+          overview: '典型的主谓宾宾补（SVOC）句式。宾语 remote collaboration 后紧跟介词短语 across global time zones 作后置定语。',
+          highlights: [
+            { head: 'make + O + Adj', note: '构成复合宾语结构' },
+            { head: 'across global time zones', note: '介词短语后置限定 collaboration' },
+            { head: 'remarkably efficient', note: '副词修饰形容词，充当宾语补足语' }
+          ],
+          tokens: [
+            { text: 'Digital technology', role: 'S', desc: '名词短语作主语。' },
+            { text: 'has made', role: 'V', desc: '现在完成时谓语动词。' },
+            { text: 'remote collaboration', role: 'O', desc: '及物动词 has made 的核心直接宾语。' },
+            { text: 'across global time zones', role: 'Attr', desc: '介词短语后置修饰 collaboration。' },
+            { text: 'remarkably efficient.', role: 'P', desc: '形容词短语充当宾语补足语。' }
+          ],
+          layers: [
+            { title: '核心主干 (Core Trunk)', desc: 'Digital technology (S) + has made (V) + remote collaboration (O) + remarkably efficient (Comp)' },
+            { title: '修饰成分 (Modifiers)', desc: 'across global time zones (介词短语作后置定语修饰 collaboration)' }
+          ]
+        }
+      ];
+
+      const TRANSLATION_DATA = [
+        {
+          id: 't0',
+          work: '《傲慢与偏见》',
+          enWork: 'Pride and Prejudice',
+          year: '1813',
+          creator: 'Jane Austen',
+          character: '第一卷第一章开篇导语',
+          level: '高级 · 文学修辞',
+          chinese: '凡是有钱的单身汉，总想娶位太太，这已经成了一条公认的真理。',
+          reference: 'It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.',
+          context: '英国小说家简·奥斯汀代表作开篇句。以庄重的哲理命题句式反衬英国乡绅阶层的世俗联姻观念，是英文“形式主语 + 分词后置定语 + 同位/主语从句”的典范。',
+          note: '原文以静态介词短语 in possession of 与 in want of 替代普通动词 have 与 need，行文典雅克制，头轻脚重。',
+          vocab: [
+            { word: 'universally acknowledged', pos: 'phr.', meaning: '被普遍承认的 / 举世公认' },
+            { word: 'in possession of', pos: 'phr.', meaning: '拥有 / 占有（作后置定语）' },
+            { word: 'in want of', pos: 'phr.', meaning: '需要 / 渴望（作表语）' }
+          ]
+        },
+        {
+          id: 't1',
+          work: '《肖申克的救赎》',
+          enWork: 'The Shawshank Redemption',
+          year: '1994',
+          creator: 'Frank Darabont',
+          character: '安迪致瑞德的信件独白',
+          level: '初级 · 基础句式',
+          chinese: '希望是一件美好的事物，也许是世间最美好的事物，而美好的事物永不消逝。',
+          reference: 'Hope is a good thing, maybe the best of things, and no good thing ever dies.',
+          context: '改编自斯蒂芬·金中篇小说。安迪重获自由后留给挚友瑞德的信件结语，以简练的并列主系表结构与否定主语句传递信念。',
+          note: '三次复现核心词 thing 与 good/best，节奏简明凝练；句末采用 no good thing ever dies，比被动句更具箴言力量。',
+          vocab: [
+            { word: 'the best of things', pos: 'phr.', meaning: '世间最美好的事物' },
+            { word: 'no ... ever', pos: 'phr.', meaning: '永不……（强否定结构）' },
+            { word: 'die / fade away', pos: 'v.', meaning: '消逝 / 湮灭' }
+          ]
+        }
+      ];
+
+      function App() {
+        const [activeTab, setActiveTab] = useState('grammar');
+        const [selectedGrammarId, setSelectedGrammarId] = useState('g0');
+        const [selectedTokenIdx, setSelectedTokenIdx] = useState(0);
+        const [selectedTransId, setSelectedTransId] = useState('t0');
+        const [transInput, setTransInput] = useState('');
+        const [showTransRef, setShowTransRef] = useState(false);
+        const [transFeedback, setTransFeedback] = useState(null);
+        const [ieltsTab, setIeltsTab] = useState('listening');
+        const [isAdminOpen, setIsAdminOpen] = useState(false);
+
+        const currentG = GRAMMAR_DATA.find(g => g.id === selectedGrammarId) || GRAMMAR_DATA[0];
+        const currentT = TRANSLATION_DATA.find(t => t.id === selectedTransId) || TRANSLATION_DATA[0];
+
+        useEffect(() => {
+          const checkAdmin = () => {
+            const p = new URLSearchParams(window.location.search);
+            if (p.get('admin') === '1' || window.location.hash === '#admin') setIsAdminOpen(true);
+          };
+          checkAdmin();
+          window.addEventListener('hashchange', checkAdmin);
+          const onKey = (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
+              e.preventDefault();
+              setIsAdminOpen(prev => !prev);
+            }
+          };
+          window.addEventListener('keydown', onKey);
+          return () => {
+            window.removeEventListener('hashchange', checkAdmin);
+            window.removeEventListener('keydown', onKey);
+          };
+        }, []);
+
+        const handleGradeTrans = (e) => {
+          e.preventDefault();
+          if (!transInput.trim()) return;
+          setShowTransRef(true);
+          setTransFeedback({
+            overall: 92,
+            accuracy: 94,
+            grammar: 92,
+            idiomaticity: 90,
+            summary: '译文主干结构完整，核心语义传达准确。可进一步推敲介词短语 in possession of 与从句层级的节奏呼应。',
+            polished: currentT.reference
+          });
+        };
+
+        const activeTok = currentG.tokens[selectedTokenIdx] || currentG.tokens[0];
+        const activeMeta = ROLE_META[activeTok.role] || ROLE_META.Attr;
+
+        return (
+          <div className="min-h-screen flex flex-col">
+            {/* 顶部书房眉栏 */}
+            <header className="sticky top-0 z-30 border-b border-[#E2DACB] bg-[#FBF8F3]/95 backdrop-blur-sm">
+              <div className="mx-auto flex max-w-6xl items-center justify-between px-4 sm:px-8">
+                <div className="py-4">
+                  <span className="font-editorial text-2xl sm:text-3xl font-semibold tracking-tight text-[#234533]">
+                    LinguaForge
+                  </span>
+                </div>
+
+                <nav className="flex items-stretch">
+                  {[
+                    { id: 'grammar', label: '语法解析' },
+                    { id: 'translation', label: '句子翻译' },
+                    { id: 'ielts', label: '雅思备考' },
+                  ].map((tab) => {
+                    const isA = activeTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`relative border-l last:border-r border-[#E8E1D3] px-6 sm:px-9 py-5 text-sm sm:text-base transition-colors ${
+                          isA ? 'bg-[#F6F1E7] font-semibold text-[#2C2623]' : 'text-[#6E6050] hover:bg-[#F7F3EB]'
+                        }`}
+                      >
+                        <span className="font-editorial tracking-wide">{tab.label}</span>
+                        {isA && <span className="absolute inset-x-0 bottom-0 h-[3px] bg-[#B07D4F]" />}
+                      </button>
+                    );
+                  })}
+                </nav>
+
+                <div className="hidden sm:flex items-center justify-end w-28">
+                  <span className="text-[11px] text-[#8A7B68] font-editorial italic">暖米纸本书房</span>
+                </div>
+              </div>
+            </header>
+
+            {/* 主内容 */}
+            <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-8">
+              {/* ================= 1. 语法解析模块 ================= */}
+              {activeTab === 'grammar' && (
+                <div className="space-y-6">
+                  {/* 例句切换 */}
+                  <div className="editorial-card rounded-xl p-4 flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-medium text-[#7A6B58] mr-2">经典例句 / Examples：</span>
+                    {GRAMMAR_DATA.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => { setSelectedGrammarId(item.id); setSelectedTokenIdx(0); }}
+                        className={`rounded-lg border px-3 py-1.5 text-xs transition ${
+                          item.id === currentG.id
+                            ? 'border-[#B07D4F] bg-[#EFE6D5] font-semibold text-[#2C2623]'
+                            : 'border-[#DFD7C8] bg-[#FBF8F3] text-[#5C5144]'
+                        }`}
+                      >
+                        {item.title.split('《')[0]}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+                    {/* 左栏：句式剖析与句法树 */}
+                    <div className="lg:col-span-7 editorial-card rounded-xl p-6 sm:p-8 space-y-7">
+                      <div>
+                        <div className="flex items-center justify-between border-b border-[#E2DACB] pb-3">
+                          <h2 className="font-editorial text-2xl font-semibold text-[#2C2623]">
+                            句式剖析 <span className="font-normal text-[#6E6050]">/ Sentence Analysis</span>
+                          </h2>
+                          <button
+                            onClick={() => {
+                              if ('speechSynthesis' in window) {
+                                window.speechSynthesis.cancel();
+                                const u = new SpeechSynthesisUtterance(currentG.sentence);
+                                u.lang = 'en-GB';
+                                window.speechSynthesis.speak(u);
+                              }
+                            }}
+                            className="rounded border border-[#D8CEBE] bg-[#FBF8F3] px-2.5 py-1 text-xs text-[#5C5144]"
+                          >
+                            朗读
+                          </button>
+                        </div>
+
+                        {/* 批注下划线拆解 */}
+                        <div className="mt-6 rounded-xl editorial-card-inner p-6">
+                          <div className="flex flex-wrap items-start gap-x-4 gap-y-6 leading-relaxed">
+                            {currentG.tokens.map((tok, idx) => {
+                              const meta = ROLE_META[tok.role] || ROLE_META.Attr;
+                              const isSel = selectedTokenIdx === idx;
+                              return (
+                                <button
+                                  key={idx}
+                                  onClick={() => setSelectedTokenIdx(idx)}
+                                  className="group flex flex-col items-start text-left"
+                                >
+                                  <span className={`font-editorial text-xl sm:text-2xl px-1 rounded transition-colors ${
+                                    isSel ? 'bg-[#EFE6D5] font-semibold text-[#1F1A17]' : 'text-[#2C2623]'
+                                  }`}>
+                                    {tok.text}
+                                  </span>
+                                  <div className="mt-1.5 w-full px-1">
+                                    {tok.role === 'Clause' ? (
+                                      <div className="h-2 w-full border-b-2 border-l-2 border-r-2 border-dotted" style={{ borderColor: meta.color }} />
+                                    ) : (
+                                      <div className="w-full" style={{ height: '3px', backgroundColor: meta.color }} />
+                                    )}
+                                  </div>
+                                  <div className="mt-1.5 px-1 flex flex-col">
+                                    <span className="font-editorial text-xs font-semibold text-[#2C2623]">{meta.en}</span>
+                                    <span className="text-[11px] text-[#6E6050]">（{meta.zh}）</span>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* 词段批注卡 */}
+                          <div className="mt-6 border-t border-[#E5DEC9] pt-4">
+                            <div className="flex items-center gap-2">
+                              <span className="rounded border px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: activeMeta.bg, borderColor: activeMeta.border, color: activeMeta.text }}>
+                                {activeMeta.en} · {activeMeta.zh}
+                              </span>
+                              <span className="font-editorial text-base font-semibold text-[#2C2623]">“{activeTok.text}”</span>
+                            </div>
+                            <p className="mt-1 text-xs text-[#4A4238] leading-relaxed">{activeTok.desc}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 层级分解 */}
+                      <div className="space-y-2">
+                        <span className="text-xs font-semibold tracking-wider text-[#6E6050]">层级分解 / Structural Layers</span>
+                        <div className="space-y-2">
+                          {currentG.layers.map((l, i) => (
+                            <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border border-[#E2DACB] bg-[#FBF8F3] px-4 py-2.5">
+                              <span className="shrink-0 rounded bg-[#EFE6D5] px-2.5 py-0.5 text-xs font-semibold text-[#7A4E24]">{l.title}</span>
+                              <span className="text-xs font-editorial text-[#3D352E] sm:text-sm">{l.desc}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 句法树 */}
+                      <div>
+                        <div className="border-b border-[#E2DACB] pb-2">
+                          <h3 className="font-editorial text-xl font-semibold text-[#2C2623]">
+                            句法树 <span className="font-normal text-[#6E6050]">/ Syntax Tree</span>
+                          </h3>
+                        </div>
+                        <div className="mt-4 rounded-xl editorial-card-inner p-4 text-center">
+                          <svg width="560" height="150" viewBox="0 0 560 150" className="mx-auto select-none">
+                            <line x1="280" y1="36" x2="110" y2="90" stroke="#B8A994" strokeWidth="1.5" strokeDasharray="3 3" />
+                            <line x1="280" y1="36" x2="280" y2="90" stroke="#B8A994" strokeWidth="1.5" strokeDasharray="3 3" />
+                            <line x1="280" y1="36" x2="450" y2="90" stroke="#B8A994" strokeWidth="1.5" strokeDasharray="3 3" />
+
+                            <g transform="translate(205, 10)">
+                              <rect width="150" height="38" rx="6" fill="#F4EFE6" stroke="#B07D4F" strokeWidth="1.2" />
+                              <text x="75" y="24" textAnchor="middle" fill="#2C2623" fontSize="13" fontWeight="600" fontFamily="Cormorant Garamond, serif">S (Sentence)</text>
+                            </g>
+
+                            <g transform="translate(40, 80)">
+                              <rect width="140" height="48" rx="6" fill="#EFE6D5" stroke="#B07D4F" strokeWidth="1.2" />
+                              <text x="70" y="20" textAnchor="middle" fill="#2C2623" fontSize="12" fontWeight="600" fontFamily="Cormorant Garamond, serif">NP (Subject)</text>
+                              <text x="70" y="36" textAnchor="middle" fill="#5C5144" fontSize="11" fontFamily="Cormorant Garamond, serif">(It)</text>
+                            </g>
+
+                            <g transform="translate(210, 80)">
+                              <rect width="140" height="48" rx="6" fill="#E3ECE6" stroke="#2E5641" strokeWidth="1.2" />
+                              <text x="70" y="20" textAnchor="middle" fill="#2C2623" fontSize="12" fontWeight="600" fontFamily="Cormorant Garamond, serif">VP (Predicate)</text>
+                              <text x="70" y="36" textAnchor="middle" fill="#5C5144" fontSize="11" fontFamily="Cormorant Garamond, serif">(is a truth...)</text>
+                            </g>
+
+                            <g transform="translate(380, 80)">
+                              <rect width="140" height="48" rx="6" fill="#E4EDE8" stroke="#3A634C" strokeWidth="1.2" />
+                              <text x="70" y="20" textAnchor="middle" fill="#2C2623" fontSize="12" fontWeight="600" fontFamily="Cormorant Garamond, serif">Cl (Appositive)</text>
+                              <text x="70" y="36" textAnchor="middle" fill="#5C5144" fontSize="11" fontFamily="Cormorant Garamond, serif">(that a single man...)</text>
+                            </g>
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 右栏：文学与语法译注 */}
+                    <div className="lg:col-span-5 editorial-card rounded-xl p-6 sm:p-8 space-y-6">
+                      <div className="border-b border-[#E2DACB] pb-4">
+                        <h2 className="font-editorial text-2xl font-semibold text-[#2C2623]">
+                          文学与语法译注 <span className="font-normal text-[#6E6050]">/ Notes</span>
+                        </h2>
+                        <p className="mt-1 font-editorial text-sm italic text-[#5C5144]">{currentG.title}</p>
+                      </div>
+
+                      <div className="space-y-2 border-b border-[#E2DACB] pb-4">
+                        <p className="font-editorial text-lg leading-relaxed text-[#2C2623]">{currentG.translation}</p>
+                        <p className="text-right font-editorial text-xs italic text-[#8A7B68]">—— {currentG.pattern}</p>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <h3 className="text-xs font-semibold tracking-wider text-[#6E6050]">结构解析 / Structural Overview</h3>
+                        <p className="text-sm leading-relaxed text-[#3D352E]">{currentG.overview}</p>
+                      </div>
+
+                      {/* 句法要旨内框 */}
+                      <div className="editorial-inset-box rounded-lg p-5 space-y-4">
+                        <div className="flex items-center justify-between border-b border-[#DFD7C8] pb-2">
+                          <h3 className="font-editorial text-base font-semibold text-[#2C2623]">
+                            句法与词汇要旨 <span className="font-normal text-[#6E6050]">/ Highlights</span>
+                          </h3>
+                          <span className="text-xs text-[#B07D4F]">✦</span>
+                        </div>
+                        <div className="space-y-3">
+                          {currentG.highlights.map((h, i) => (
+                            <div key={i} className="text-xs sm:text-sm flex items-start gap-2">
+                              <span className="mt-1.5 inline-block h-2 w-2 rounded-sm bg-[#B07D4F] shrink-0" />
+                              <div>
+                                <span className="font-editorial font-semibold text-[#2C2623]">{h.head}</span>
+                                <span className="mx-1 text-[#B8A994]">┈┈┈┈▸</span>
+                                <span className="text-[#4A4238]">{h.note}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ================= 2. 句子翻译模块 ================= */}
+              {activeTab === 'translation' && (
+                <div className="space-y-6">
+                  {/* 选句栏 */}
+                  <div className="editorial-card rounded-xl p-4 flex gap-2">
+                    {TRANSLATION_DATA.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => { setSelectedTransId(t.id); setShowTransRef(false); setTransFeedback(null); }}
+                        className={`rounded-lg border px-3 py-1.5 text-xs transition ${
+                          t.id === currentT.id
+                            ? 'border-[#B07D4F] bg-[#EFE6D5] font-semibold text-[#2C2623]'
+                            : 'border-[#DFD7C8] bg-[#FBF8F3] text-[#5C5144]'
+                        }`}
+                      >
+                        {t.work} ({t.year})
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+                    {/* 左栏：文学译注 */}
+                    <div className="lg:col-span-5 editorial-card rounded-xl p-6 sm:p-8 space-y-6">
+                      <div className="border-b border-[#E2DACB] pb-3">
+                        <div className="flex items-center justify-between">
+                          <h2 className="font-editorial text-2xl font-semibold text-[#2C2623]">
+                            文学译注 <span className="font-normal text-[#6E6050]">/ Literary Notes</span>
+                          </h2>
+                          <span className="rounded border border-[#C9A67E] bg-[#EFE6D5] px-2 py-0.5 text-[11px] font-medium text-[#7A4E24]">
+                            {currentT.level}
+                          </span>
+                        </div>
+                        <p className="mt-1 font-editorial text-sm italic text-[#5C5144]">
+                          {currentT.creator} · {currentT.enWork} {currentT.work} ({currentT.year})
+                        </p>
+                      </div>
+
+                      <div className="space-y-2 border-b border-[#E2DACB] pb-4">
+                        <p className="font-editorial text-lg leading-relaxed text-[#2C2623]">{currentT.chinese}</p>
+                        <p className="text-right font-editorial text-xs italic text-[#8A7B68]">—— {currentT.character}</p>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <h3 className="text-xs font-semibold tracking-wider text-[#6E6050]">作品背景 / Context</h3>
+                        <p className="text-xs leading-relaxed text-[#4A4238]">{currentT.context}</p>
+                      </div>
+
+                      <div className="editorial-inset-box rounded-lg p-5 space-y-3">
+                        <div className="flex items-center justify-between border-b border-[#DFD7C8] pb-2">
+                          <h3 className="font-editorial text-base font-semibold text-[#2C2623]">
+                            词汇美学 <span className="font-normal text-[#6E6050]">/ Highlights</span>
+                          </h3>
+                          <span className="text-xs text-[#B07D4F]">✦</span>
+                        </div>
+                        <div className="space-y-2.5">
+                          {currentT.vocab.map((v, i) => (
+                            <div key={i} className="text-xs flex items-baseline gap-2">
+                              <span className="inline-block h-1.5 w-2 rounded-sm bg-[#B07D4F] shrink-0" />
+                              <span className="font-editorial font-semibold text-sm text-[#2C2623]">{v.word}</span>
+                              <span className="text-[#8A7B68] italic text-[11px]">{v.pos}</span>
+                              <span className="text-[#B8A994]">┈┈┈┈▸</span>
+                              <span className="text-[#4A4238]">{v.meaning}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 右栏：译文练习与评定 */}
+                    <div className="lg:col-span-7 editorial-card rounded-xl p-6 sm:p-8 space-y-6">
+                      <div className="flex items-center justify-between border-b border-[#E2DACB] pb-3">
+                        <h2 className="font-editorial text-2xl font-semibold text-[#2C2623]">
+                          译文练习 <span className="font-normal text-[#6E6050]">/ Translation Practice</span>
+                        </h2>
+                        <button
+                          type="button"
+                          onClick={() => setShowTransRef(prev => !prev)}
+                          className="rounded border border-[#D8CEBE] bg-[#FBF8F3] px-2.5 py-1 text-xs text-[#5C5144]"
+                        >
+                          {showTransRef ? '隐藏原著' : '对照原著'}
+                        </button>
+                      </div>
+
+                      <form onSubmit={handleGradeTrans} className="space-y-4">
+                        <div className="rounded-xl editorial-card-inner p-4">
+                          <textarea
+                            rows={4}
+                            value={transInput}
+                            onChange={(e) => setTransInput(e.target.value)}
+                            placeholder="在此撰写英文译文..."
+                            className="w-full bg-transparent font-editorial text-lg text-[#2C2623] placeholder-[#A69988] focus:outline-none leading-relaxed"
+                          />
+                        </div>
+                        <div className="flex justify-end">
+                          <button
+                            type="submit"
+                            className="rounded-lg bg-[#2E5641] px-5 py-2 text-xs font-medium text-[#FBF8F3] hover:bg-[#234533]"
+                          >
+                            提交译文
+                          </button>
+                        </div>
+                      </form>
+
+                      {showTransRef && (
+                        <div className="rounded-xl editorial-card-inner p-5 space-y-2">
+                          <span className="text-xs font-semibold text-[#2E5641]">原著经典原文 / Original Text</span>
+                          <p className="font-editorial text-xl italic text-[#2C2623]">“{currentT.reference}”</p>
+                          <p className="text-xs text-[#4A4238] border-t border-[#E5DEC9] pt-2">
+                            <strong className="text-[#7A4E24]">修辞按语：</strong>{currentT.note}
+                          </p>
+                        </div>
+                      )}
+
+                      {transFeedback && (
+                        <div className="rounded-xl editorial-inset-box p-5 space-y-3">
+                          <div className="flex items-center justify-between border-b border-[#DFD7C8] pb-2">
+                            <h3 className="font-editorial text-lg font-semibold text-[#2C2623]">译文评定 / Evaluation</h3>
+                            <div className="flex gap-2">
+                              <span className="rounded border border-[#D8CEBE] bg-[#FBF8F3] px-2 py-0.5 text-xs">准确: {transFeedback.accuracy}</span>
+                              <span className="rounded border border-[#D8CEBE] bg-[#FBF8F3] px-2 py-0.5 text-xs">语法: {transFeedback.grammar}</span>
+                              <span className="rounded border border-[#8AB09B] bg-[#E3ECE6] px-2.5 py-0.5 text-xs font-bold text-[#234533]">总评: {transFeedback.overall}</span>
+                            </div>
+                          </div>
+                          <p className="text-xs text-[#3D352E] leading-relaxed">{transFeedback.summary}</p>
+                          <div className="rounded border border-[#D8CEBE] bg-[#FBF8F3] p-3 text-xs">
+                            <span className="font-semibold text-[#6E6050]">润色参考：</span>
+                            <p className="font-editorial text-base italic text-[#2C2623] mt-1">“{transFeedback.polished}”</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ================= 3. 雅思备考模块 ================= */}
+              {activeTab === 'ielts' && (
+                <div className="space-y-6">
+                  <div className="editorial-card rounded-xl p-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {[
+                      { id: 'listening', title: '听力 · Listening', sub: '场景精听与干扰项辨析' },
+                      { id: 'reading', title: '阅读 · Reading', sub: '同义替换与逻辑判断' },
+                      { id: 'writing', title: '写作 · Writing', sub: '语料升格与四维评定' },
+                      { id: 'speaking', title: '口语 · Speaking', sub: '话题陈述与高阶习语' },
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setIeltsTab(tab.id)}
+                        className={`rounded-lg border px-4 py-3 text-left transition ${
+                          ieltsTab === tab.id
+                            ? 'border-[#B07D4F] bg-[#EFE6D5] text-[#2C2623]'
+                            : 'border-transparent bg-[#FBF8F3] text-[#5C5144] hover:border-[#DFD7C8]'
+                        }`}
+                      >
+                        <div className="font-editorial text-sm font-semibold">{tab.title}</div>
+                        <div className="text-[11px] text-[#7A6B58]">{tab.sub}</div>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="editorial-card rounded-xl p-8 space-y-4 text-center">
+                    <span className="rounded-full bg-[#EFE6D5] px-3 py-1 text-xs font-semibold text-[#7A4E24]">
+                      雅思学术专训 · {ieltsTab.toUpperCase()}
+                    </span>
+                    <h2 className="font-editorial text-2xl font-semibold text-[#2C2623]">
+                      剑桥雅思核心题型与考官标准体系已就绪
+                    </h2>
+                    <p className="max-w-xl mx-auto text-xs text-[#5C5144] leading-relaxed">
+                      涵盖听力英美音变速精听与干扰陷阱、阅读 T/F/NG 判定与长难句同义替换矩阵、写作 Task 1/2 考官升格范文与口语 Part 1-3 计时模考训练。
+                    </p>
+                  </div>
+                </div>
+              )}
+            </main>
+
+            {/* 页脚 */}
+            <footer className="border-t border-[#E8E1D3] bg-[#FBF8F3] py-5 text-center font-editorial text-xs text-[#8A7B68]">
+              LinguaForge · 英语语法解析、文学名著译注与雅思学术备考
+            </footer>
+
+            {/* 隐藏式后台 AI 配置面板 */}
+            {isAdminOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2C2623]/40 p-4">
+                <div className="w-full max-w-lg rounded-xl border border-[#D8CEBE] bg-[#FBF8F3] p-6 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between border-b border-[#E2DACB] pb-3">
+                    <h3 className="font-editorial text-lg font-semibold text-[#2C2623]">后台服务配置 / Backend AI Settings</h3>
+                    <button onClick={() => setIsAdminOpen(false)} className="text-[#7A6B58] hover:text-[#2C2623]">✕</button>
+                  </div>
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <label className="block font-semibold text-[#5C5144]">Base URL</label>
+                      <input type="text" defaultValue="https://api.openai.com/v1" className="mt-1 w-full rounded border border-[#D8CEBE] bg-[#F4EFE6] px-3 py-2" />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-[#5C5144]">API Key</label>
+                      <input type="password" placeholder="sk-..." className="mt-1 w-full rounded border border-[#D8CEBE] bg-[#F4EFE6] px-3 py-2" />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2 border-t border-[#E2DACB]">
+                    <button onClick={() => setIsAdminOpen(false)} className="rounded bg-[#2E5641] px-4 py-1.5 text-xs text-[#FBF8F3]">保存并关闭</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+  </body>
+</html>

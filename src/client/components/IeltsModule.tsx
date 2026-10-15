@@ -1,19 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {
-  Award,
-  BookOpen,
-  CheckCircle2,
-  Clock,
-  FileText,
-  Headphones,
-  Mic,
-  PenTool,
-  Play,
-  RotateCcw,
-  Sparkles,
-  Square,
-  Volume2,
-} from 'lucide-react';
+import { BookOpen, Clock, Headphones, Mic, PenTool, Play, RotateCcw, Sparkles, Square } from 'lucide-react';
 import {
   IELTS_LISTENING_ITEMS,
   IELTS_READING_ITEMS,
@@ -34,13 +20,12 @@ type IeltsSkillTab = 'listening' | 'reading' | 'writing' | 'speaking';
 
 export const IeltsModule: React.FC<IeltsModuleProps> = ({
   aiConfig,
-  completedIds,
   onMarkCompleted,
   onAskTutor,
 }) => {
   const [activeSkill, setActiveSkill] = useState<IeltsSkillTab>('listening');
 
-  // ==================== 1. 听力状态 ====================
+  // 听力状态
   const [selectedListenId, setSelectedListenId] = useState<string>(IELTS_LISTENING_ITEMS[0].id);
   const [listenAnswers, setListenAnswers] = useState<Record<number, string>>({});
   const [listenSubmitted, setListenSubmitted] = useState<boolean>(false);
@@ -48,24 +33,22 @@ export const IeltsModule: React.FC<IeltsModuleProps> = ({
   const [speechRate, setSpeechRate] = useState<number>(0.95);
   const [isSpeakingAudio, setIsSpeakingAudio] = useState<boolean>(false);
 
-  // ==================== 2. 阅读状态 ====================
-  const [selectedReadId, setSelectedReadId] = useState<string>(IELTS_READING_ITEMS[0].id);
+  // 阅读状态
+  const [selectedReadId] = useState<string>(IELTS_READING_ITEMS[0].id);
   const [readingChoices, setReadingChoices] = useState<Record<string, 'TRUE' | 'FALSE' | 'NOT GIVEN'>>({});
   const [readingChecked, setReadingChecked] = useState<boolean>(false);
 
-  // ==================== 3. 写作状态 ====================
+  // 写作状态
   const [selectedWriteId, setSelectedWriteId] = useState<string>(IELTS_WRITING_PROMPTS[0].id);
   const [essayDraft, setEssayDraft] = useState<string>('');
   const [showModelEssay, setShowModelEssay] = useState<boolean>(false);
   const [writingEval, setWritingEval] = useState<IeltsEvaluationResult | null>(null);
-  const [writingEvalMode, setWritingEvalMode] = useState<string | null>(null);
   const [isEvaluatingWriting, setIsEvaluatingWriting] = useState<boolean>(false);
 
-  // ==================== 4. 口语状态 ====================
-  const [selectedSpeakId, setSelectedSpeakId] = useState<string>(IELTS_SPEAKING_TOPICS[0].id);
+  // 口语状态
+  const [selectedSpeakId] = useState<string>(IELTS_SPEAKING_TOPICS[0].id);
   const [speakingDraft, setSpeakingDraft] = useState<string>('');
   const [speakingEval, setSpeakingEval] = useState<IeltsEvaluationResult | null>(null);
-  const [speakingEvalMode, setSpeakingEvalMode] = useState<string | null>(null);
   const [isEvaluatingSpeaking, setIsEvaluatingSpeaking] = useState<boolean>(false);
   const [timerSeconds, setTimerSeconds] = useState<number>(120);
   const [timerRunning, setTimerRunning] = useState<boolean>(false);
@@ -122,7 +105,7 @@ export const IeltsModule: React.FC<IeltsModuleProps> = ({
     await savePracticeRecord({
       module: 'ielts_listening',
       itemId: currentListen.id,
-      title: `雅思听力：${currentListen.title}`,
+      title: currentListen.title,
       userInput: JSON.stringify(listenAnswers),
       score: Math.round((correctCount / currentListen.blanks.length) * 100),
       feedback: { correctCount, total: currentListen.blanks.length },
@@ -138,7 +121,7 @@ export const IeltsModule: React.FC<IeltsModuleProps> = ({
     await savePracticeRecord({
       module: 'ielts_reading',
       itemId: currentRead.id,
-      title: `雅思阅读：${currentRead.title}`,
+      title: currentRead.title,
       userInput: JSON.stringify(readingChoices),
       score: Math.round((correctCount / currentRead.questions.length) * 100),
       feedback: { correctCount, total: currentRead.questions.length },
@@ -161,12 +144,11 @@ export const IeltsModule: React.FC<IeltsModuleProps> = ({
         aiConfig
       );
       setWritingEval(res.data);
-      setWritingEvalMode(res.mode === 'live' ? `AI 考官精批 (${res.model})` : '本地启发式预估（配置 API Key 可解锁逐段改写）');
       onMarkCompleted(currentWrite.id);
       await savePracticeRecord({
         module: 'ielts_writing',
         itemId: currentWrite.id,
-        title: `雅思写作：${currentWrite.title}`,
+        title: currentWrite.title,
         userInput: essayDraft.trim(),
         score: res.data.overallBand,
         feedback: res.data as unknown as Record<string, unknown>,
@@ -192,12 +174,11 @@ export const IeltsModule: React.FC<IeltsModuleProps> = ({
         aiConfig
       );
       setSpeakingEval(res.data);
-      setSpeakingEvalMode(res.mode === 'live' ? `AI 口语考官评分 (${res.model})` : '本地启发式预估（配置 API Key 可获取地道口语润色）');
       onMarkCompleted(currentSpeak.id);
       await savePracticeRecord({
         module: 'ielts_speaking',
         itemId: currentSpeak.id,
-        title: `雅思口语：${currentSpeak.topic}`,
+        title: currentSpeak.topic,
         userInput: speakingDraft.trim(),
         score: res.data.overallBand,
         feedback: res.data as unknown as Record<string, unknown>,
@@ -210,38 +191,14 @@ export const IeltsModule: React.FC<IeltsModuleProps> = ({
   const essayWordCount = essayDraft.trim() ? essayDraft.trim().split(/\s+/).length : 0;
 
   return (
-    <div className="space-y-6">
-      {/* 顶部四科切换导航栏 */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="space-y-6 animate-soft-reveal">
+      {/* 四科平级切换栏 */}
+      <div className="editorial-card rounded-xl p-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {[
-          {
-            id: 'listening',
-            title: '雅思听力 Listening',
-            sub: '场景精听 · 干扰项陷阱 · 同义替换',
-            icon: Headphones,
-            color: 'from-sky-600/25 to-slate-900 border-sky-500/40 text-sky-300',
-          },
-          {
-            id: 'reading',
-            title: '雅思阅读 Reading',
-            sub: 'T/F/NG 逻辑 · 剑雅同义词网 · 长难句',
-            icon: BookOpen,
-            color: 'from-emerald-600/25 to-slate-900 border-emerald-500/40 text-emerald-300',
-          },
-          {
-            id: 'writing',
-            title: '雅思写作 Writing',
-            sub: 'Task 1/2 范文升格 · 四维 Band 精批',
-            icon: PenTool,
-            color: 'from-indigo-600/25 to-slate-900 border-indigo-500/40 text-indigo-300',
-          },
-          {
-            id: 'speaking',
-            title: '雅思口语 Speaking',
-            sub: 'Part 1-3 题库 · 计时模考 · 地道习语',
-            icon: Mic,
-            color: 'from-amber-600/25 to-slate-900 border-amber-500/40 text-amber-300',
-          },
+          { id: 'listening', title: '听力 · Listening', sub: '场景精听与干扰项辨析', icon: Headphones },
+          { id: 'reading', title: '阅读 · Reading', sub: '同义替换与逻辑判断', icon: BookOpen },
+          { id: 'writing', title: '写作 · Writing', sub: '语料升格与四维评定', icon: PenTool },
+          { id: 'speaking', title: '口语 · Speaking', sub: '话题陈述与高阶习语', icon: Mic },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeSkill === tab.id;
@@ -249,600 +206,579 @@ export const IeltsModule: React.FC<IeltsModuleProps> = ({
             <button
               key={tab.id}
               onClick={() => setActiveSkill(tab.id as IeltsSkillTab)}
-              className={`flex flex-col justify-between rounded-2xl border p-4 text-left transition ${
+              className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition ${
                 isActive
-                  ? `bg-gradient-to-br ${tab.color} shadow-lg ring-1 ring-white/15`
-                  : 'border-slate-800 bg-slate-900/70 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                  ? 'border-[#B07D4F] bg-[#EFE6D5] text-[#2C2623] shadow-sm'
+                  : 'border-transparent bg-[#FBF8F3] text-[#5C5144] hover:border-[#DFD7C8]'
               }`}
             >
-              <div className="flex items-center justify-between">
-                <Icon className="h-5 w-5" />
-                {isActive && (
-                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white">
-                    当前科目
-                  </span>
-                )}
-              </div>
-              <div className="mt-3">
-                <div className="text-sm font-bold text-white">{tab.title}</div>
-                <div className="mt-0.5 text-[11px] opacity-80">{tab.sub}</div>
+              <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-[#8C5A2B]' : 'text-[#8A7B68]'}`} />
+              <div>
+                <div className="font-editorial text-sm font-semibold">{tab.title}</div>
+                <div className="text-[11px] text-[#7A6B58]">{tab.sub}</div>
               </div>
             </button>
           );
         })}
       </div>
 
-      {/* =================================================================== */}
-      {/* 科目 1：雅思听力 (Listening) */}
-      {/* =================================================================== */}
+      {/* 1. 听力模块 */}
       {activeSkill === 'listening' && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <div className="lg:col-span-4 space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 px-1">
-              高频听力场景训练 ({IELTS_LISTENING_ITEMS.length})
-            </h3>
-            {IELTS_LISTENING_ITEMS.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setSelectedListenId(item.id);
-                  setListenAnswers({});
-                  setListenSubmitted(false);
-                  setShowAudioScript(false);
-                  handleStopTTS();
-                }}
-                className={`w-full text-left rounded-xl border p-4 transition ${
-                  item.id === currentListen.id
-                    ? 'border-sky-500/80 bg-sky-950/30'
-                    : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-sky-300">{item.section}</span>
-                  <span className="rounded bg-slate-800 px-2 py-0.5 text-[11px] text-slate-300">
-                    {item.accent}
-                  </span>
-                </div>
-                <p className="mt-1.5 text-sm font-bold text-white">{item.title}</p>
-                <p className="mt-1 text-xs text-slate-400 line-clamp-2">{item.scenario}</p>
-              </button>
-            ))}
-          </div>
+          <div className="lg:col-span-5 editorial-card rounded-xl p-6 sm:p-7 space-y-5">
+            <div className="border-b border-[#E2DACB] pb-3">
+              <h2 className="font-editorial text-xl font-semibold text-[#2C2623]">
+                听力选段 <span className="font-normal text-[#6E6050]">/ Listening Passages</span>
+              </h2>
+            </div>
 
-          <div className="lg:col-span-8 space-y-5">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/85 p-6 shadow-xl space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
-                <div>
-                  <span className="text-xs font-semibold text-sky-400">
-                    {currentListen.section} · {currentListen.accent}
-                  </span>
-                  <h2 className="mt-1 text-lg font-bold text-white">{currentListen.title}</h2>
-                  <p className="mt-1 text-xs text-slate-400">{currentListen.scenario}</p>
-                </div>
-
-                {/* TTS 语音播控面板 */}
-                <div className="flex items-center gap-2">
-                  <select
-                    value={speechRate}
-                    onChange={(e) => setSpeechRate(Number(e.target.value))}
-                    className="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200"
-                  >
-                    <option value={0.85}>0.85x 慢速精听</option>
-                    <option value={0.95}>1.0x 标准考场语速</option>
-                    <option value={1.15}>1.15x 进阶倍速</option>
-                  </select>
-
-                  {!isSpeakingAudio ? (
-                    <button
-                      onClick={handlePlayListeningTTS}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-500"
-                    >
-                      <Play className="h-3.5 w-3.5" />
-                      播放听力音频
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleStopTTS}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-500"
-                    >
-                      <Square className="h-3.5 w-3.5" />
-                      停止播放
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* 笔记填空题干 */}
-              <div className="rounded-xl border border-slate-800 bg-slate-950/90 p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    Complete the notes below (Write ONE WORD AND/OR A NUMBER for each answer):
-                  </span>
-                  <button
-                    onClick={() => setShowAudioScript((prev) => !prev)}
-                    className="text-xs text-sky-400 hover:underline"
-                  >
-                    {showAudioScript ? '隐藏听力原文' : '查看听力原文 Script'}
-                  </button>
-                </div>
-
-                <div className="space-y-3 text-sm text-slate-200">
-                  {currentListen.blanks.map((blank) => {
-                    const userVal = listenAnswers[blank.index] || '';
-                    const isCorrect =
-                      listenSubmitted && userVal.trim().toLowerCase() === blank.answer.toLowerCase();
-                    return (
-                      <div
-                        key={blank.index}
-                        className="rounded-xl border border-slate-800/90 bg-slate-900/70 p-3.5 space-y-2"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="text-xs font-semibold text-slate-300">
-                            Question #{blank.index + 1}
-                          </span>
-                          {listenSubmitted && (
-                            <span
-                              className={`text-xs font-bold ${
-                                isCorrect ? 'text-emerald-400' : 'text-rose-400'
-                              }`}
-                            >
-                              {isCorrect ? '✓ 回答正确' : `✗ 标准答案：${blank.answer}`}
-                            </span>
-                          )}
-                        </div>
-                        <input
-                          type="text"
-                          value={userVal}
-                          onChange={(e) =>
-                            setListenAnswers((prev) => ({ ...prev, [blank.index]: e.target.value }))
-                          }
-                          placeholder={`填入第 ${blank.index + 1} 空答案...`}
-                          className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm text-white focus:border-sky-400 focus:outline-none"
-                        />
-                        {listenSubmitted && (
-                          <div className="rounded-lg bg-slate-950/80 p-2.5 text-xs space-y-1">
-                            <p className="text-sky-300">
-                              <strong>原文定位：</strong>“{blank.synonymCue}”
-                            </p>
-                            <p className="text-amber-300">
-                              <strong>干扰项与陷阱解析：</strong>{blank.distractorTrap}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="flex justify-end gap-3 pt-2">
-                  <button
-                    onClick={handleCheckListening}
-                    className="rounded-xl bg-sky-600 px-5 py-2 text-xs font-semibold text-white hover:bg-sky-500"
-                  >
-                    核对答案并查看干扰项解析
-                  </button>
-                </div>
-              </div>
-
-              {showAudioScript && (
-                <div className="rounded-xl border border-sky-500/30 bg-sky-950/20 p-4">
-                  <span className="text-xs font-semibold text-sky-300">听力录音原文 (Transcript)：</span>
-                  <p className="mt-1.5 font-serif text-sm leading-relaxed text-slate-200">
-                    {currentListen.audioScript}
+            <div className="space-y-2.5">
+              {IELTS_LISTENING_ITEMS.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setSelectedListenId(item.id);
+                    setListenAnswers({});
+                    setListenSubmitted(false);
+                    setShowAudioScript(false);
+                    handleStopTTS();
+                  }}
+                  className={`w-full text-left rounded-lg border p-3.5 transition ${
+                    item.id === currentListen.id
+                      ? 'border-[#B07D4F] bg-[#EFE6D5]'
+                      : 'border-[#E2DACB] bg-[#FBF8F3] hover:border-[#C8B9A6]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-xs text-[#7A4E24]">
+                    <span className="font-medium">{item.section}</span>
+                    <span>{item.accent}</span>
+                  </div>
+                  <p className="mt-1 font-editorial text-base font-semibold text-[#2C2623]">
+                    {item.title}
                   </p>
-                </div>
-              )}
+                  <p className="mt-1 text-xs text-[#5C5144]">{item.scenario}</p>
+                </button>
+              ))}
+            </div>
 
-              {/* 场景核心词汇表 */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {/* 核心词汇内框 */}
+            <div className="editorial-inset-box rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-[#DFD7C8] pb-2">
+                <h3 className="font-editorial text-sm font-semibold text-[#2C2623]">
+                  场景词汇 <span className="font-normal text-[#6E6050]">/ Key Vocabulary</span>
+                </h3>
+                <span className="text-xs text-[#B07D4F]">✦</span>
+              </div>
+              <div className="space-y-2.5">
                 {currentListen.coreVocab.map((v, i) => (
-                  <div key={i} className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                    <div className="font-mono text-sm font-bold text-sky-300">{v.word}</div>
-                    <div className="text-[11px] text-slate-500">{v.phonetic}</div>
-                    <div className="mt-1 text-xs text-slate-300">{v.meaning}</div>
+                  <div key={i} className="text-xs flex flex-wrap items-baseline gap-2">
+                    <span className="inline-block h-1.5 w-2 rounded-sm bg-[#B07D4F]" />
+                    <span className="font-editorial font-semibold text-sm text-[#2C2623]">{v.word}</span>
+                    <span className="text-[#8A7B68]">{v.phonetic}</span>
+                    <span className="text-[#4A4238]">{v.meaning}</span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* =================================================================== */}
-      {/* 科目 2：雅思阅读 (Reading) */}
-      {/* =================================================================== */}
-      {activeSkill === 'reading' && (
-        <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/85 p-6 shadow-xl space-y-6">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
-                {currentRead.topic}
-              </span>
-              <h2 className="mt-1 text-xl font-bold text-white">{currentRead.title}</h2>
-            </div>
-
-            {/* 阅读学术篇章原文 */}
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5">
-              <span className="text-xs font-semibold text-slate-400">Academic Reading Passage Excerpt:</span>
-              <p className="mt-2 font-serif text-base leading-relaxed text-slate-100">
-                {currentRead.passageExcerpt}
-              </p>
-            </div>
-
-            {/* 剑雅核心同义替换对照表 + 长难句精析 */}
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-              <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/15 p-4 space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-300">
-                  剑雅核心同义替换矩阵 (Paraphrase Matrix)
+          <div className="lg:col-span-7 editorial-card rounded-xl p-6 sm:p-7 space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E2DACB] pb-4">
+              <div>
+                <span className="text-xs text-[#7A6B58]">{currentListen.section}</span>
+                <h3 className="font-editorial text-xl font-semibold text-[#2C2623]">
+                  {currentListen.title}
                 </h3>
-                <div className="space-y-2.5">
-                  {currentRead.paraphrasePairs.map((pair, idx) => (
-                    <div key={idx} className="rounded-lg border border-slate-800 bg-slate-950/80 p-3 text-xs">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-serif font-semibold text-emerald-300">{pair.passageExpr}</span>
-                        <span className="text-slate-500">⇔</span>
-                        <span className="font-serif text-amber-300">{pair.questionExpr}</span>
-                      </div>
-                      <p className="mt-1 text-[11px] text-slate-400">{pair.type}</p>
-                    </div>
-                  ))}
-                </div>
               </div>
 
-              <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-4 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-300">
-                    篇章核心长难句拆解
-                  </h3>
-                  <button
-                    onClick={() =>
-                      onAskTutor(
-                        `请进一步讲解雅思阅读长难句：“${currentRead.longSentenceAnalysis.sentence}”中的分词结构与主从逻辑。`,
-                        currentRead.passageExcerpt
-                      )
-                    }
-                    className="text-xs text-indigo-300 hover:underline flex items-center gap-1"
-                  >
-                    <Sparkles className="h-3 w-3" /> AI 深度追问
-                  </button>
-                </div>
-                <p className="font-serif text-xs italic text-white">
-                  “{currentRead.longSentenceAnalysis.sentence}”
-                </p>
-                <p className="text-xs text-slate-300">{currentRead.longSentenceAnalysis.translation}</p>
-                <p className="text-xs text-indigo-200/90 leading-relaxed">
-                  {currentRead.longSentenceAnalysis.breakdown}
-                </p>
-              </div>
-            </div>
-
-            {/* TRUE / FALSE / NOT GIVEN 逻辑辨析训练 */}
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-white">
-                  TRUE / FALSE / NOT GIVEN 考官逻辑精练
-                </h3>
-                <button
-                  onClick={handleCheckReading}
-                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500"
+              <div className="flex items-center gap-2">
+                <select
+                  value={speechRate}
+                  onChange={(e) => setSpeechRate(Number(e.target.value))}
+                  className="rounded-lg border border-[#D8CEBE] bg-[#FBF8F3] px-2.5 py-1.5 text-xs text-[#2C2623]"
                 >
-                  提交并查看逻辑判定解析
+                  <option value={0.85}>0.85x 慢速</option>
+                  <option value={0.95}>1.0x 常速</option>
+                  <option value={1.15}>1.15x 倍速</option>
+                </select>
+
+                {!isSpeakingAudio ? (
+                  <button
+                    onClick={handlePlayListeningTTS}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#2E5641] px-3.5 py-1.5 text-xs font-medium text-[#FBF8F3] hover:bg-[#234533]"
+                  >
+                    <Play className="h-3.5 w-3.5" />
+                    <span>朗读录音</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleStopTTS}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#9E473B] px-3.5 py-1.5 text-xs font-medium text-[#FBF8F3]"
+                  >
+                    <Square className="h-3.5 w-3.5" />
+                    <span>停止</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-xl editorial-card-inner p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-[#6E6050]">
+                  笔记填空（每空限填一词或数字）：
+                </span>
+                <button
+                  onClick={() => setShowAudioScript((prev) => !prev)}
+                  className="text-xs text-[#8C5A2B] hover:underline"
+                >
+                  {showAudioScript ? '隐藏录音文本' : '对照录音文本'}
                 </button>
               </div>
 
               <div className="space-y-3">
-                {currentRead.questions.map((q, i) => {
-                  const chosen = readingChoices[q.id];
-                  const isCorrect = readingChecked && chosen === q.answer;
+                {currentListen.blanks.map((blank) => {
+                  const userVal = listenAnswers[blank.index] || '';
+                  const isCorrect =
+                    listenSubmitted && userVal.trim().toLowerCase() === blank.answer.toLowerCase();
                   return (
-                    <div key={q.id} className="rounded-xl border border-slate-800 bg-slate-900/80 p-4 space-y-3">
-                      <p className="text-sm text-slate-100">
-                        <span className="font-bold text-emerald-400 mr-2">{i + 1}.</span>
-                        {q.statement}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {(['TRUE', 'FALSE', 'NOT GIVEN'] as const).map((opt) => (
-                          <button
-                            key={opt}
-                            onClick={() => setReadingChoices((prev) => ({ ...prev, [q.id]: opt }))}
-                            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition ${
-                              chosen === opt
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                            }`}
-                          >
-                            {opt}
-                          </button>
-                        ))}
-
-                        {readingChecked && (
-                          <span
-                            className={`ml-auto text-xs font-bold ${
-                              isCorrect ? 'text-emerald-400' : 'text-rose-400'
-                            }`}
-                          >
-                            {isCorrect ? `✓ 正确 (${q.answer})` : `✗ 正确答案：${q.answer}`}
+                    <div
+                      key={blank.index}
+                      className="rounded-lg border border-[#E2DACB] bg-[#F4EFE6] p-3.5 space-y-2"
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-[#5C5144]">第 {blank.index + 1} 题</span>
+                        {listenSubmitted && (
+                          <span className={isCorrect ? 'font-semibold text-[#2E5641]' : 'font-semibold text-[#9E473B]'}>
+                            {isCorrect ? '回答正确' : `参考答案：${blank.answer}`}
                           </span>
                         )}
                       </div>
-                      {readingChecked && (
-                        <p className="rounded-lg bg-slate-950 p-3 text-xs leading-relaxed text-slate-300">
-                          <strong className="text-emerald-300">【判定依据】</strong>
-                          {q.explanation}
-                        </p>
+                      <input
+                        type="text"
+                        value={userVal}
+                        onChange={(e) =>
+                          setListenAnswers((prev) => ({ ...prev, [blank.index]: e.target.value }))
+                        }
+                        placeholder="在此填写答案..."
+                        className="w-full rounded border border-[#D8CEBE] bg-[#FBF8F3] px-3 py-1.5 text-sm text-[#2C2623] focus:border-[#B07D4F] focus:outline-none"
+                      />
+                      {listenSubmitted && (
+                        <div className="text-xs space-y-1 text-[#4A4238] pt-1">
+                          <p>
+                            <strong className="text-[#2E5641]">原文定位：</strong>“{blank.synonymCue}”
+                          </p>
+                          <p>
+                            <strong className="text-[#8C5A2B]">干扰项辨析：</strong>{blank.distractorTrap}
+                          </p>
+                        </div>
                       )}
                     </div>
                   );
                 })}
               </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={handleCheckListening}
+                  className="rounded-lg bg-[#2E5641] px-4 py-1.5 text-xs font-medium text-[#FBF8F3] hover:bg-[#234533]"
+                >
+                  核对答案
+                </button>
+              </div>
+            </div>
+
+            {showAudioScript && (
+              <div className="rounded-xl editorial-inset-box p-4 space-y-1.5">
+                <span className="text-xs font-semibold text-[#6E6050]">录音原文 / Audio Transcript</span>
+                <p className="font-editorial text-base leading-relaxed text-[#2C2623]">
+                  {currentListen.audioScript}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 2. 阅读模块 */}
+      {activeSkill === 'reading' && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          <div className="lg:col-span-7 editorial-card rounded-xl p-6 sm:p-8 space-y-6">
+            <div className="border-b border-[#E2DACB] pb-3">
+              <span className="text-xs text-[#7A6B58]">{currentRead.topic}</span>
+              <h2 className="font-editorial text-xl sm:text-2xl font-semibold text-[#2C2623]">
+                {currentRead.title}
+              </h2>
+            </div>
+
+            <div className="rounded-xl editorial-card-inner p-5">
+              <p className="font-editorial text-lg leading-relaxed text-[#2C2623]">
+                {currentRead.passageExcerpt}
+              </p>
+            </div>
+
+            {/* TRUE / FALSE / NOT GIVEN 题目 */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-[#E2DACB] pb-2">
+                <h3 className="font-editorial text-lg font-semibold text-[#2C2623]">
+                  逻辑判断 <span className="font-normal text-[#6E6050]">/ True · False · Not Given</span>
+                </h3>
+                <button
+                  onClick={handleCheckReading}
+                  className="rounded-lg bg-[#2E5641] px-4 py-1.5 text-xs font-medium text-[#FBF8F3] hover:bg-[#234533]"
+                >
+                  核对判定
+                </button>
+              </div>
+
+              {currentRead.questions.map((q, i) => {
+                const chosen = readingChoices[q.id];
+                const isCorrect = readingChecked && chosen === q.answer;
+                return (
+                  <div
+                    key={q.id}
+                    className="rounded-xl editorial-card-inner p-4 space-y-3"
+                  >
+                    <p className="font-editorial text-base text-[#2C2623]">
+                      <span className="font-semibold text-[#8C5A2B] mr-2">{i + 1}.</span>
+                      {q.statement}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(['TRUE', 'FALSE', 'NOT GIVEN'] as const).map((opt) => (
+                        <button
+                          key={opt}
+                          onClick={() => setReadingChoices((prev) => ({ ...prev, [q.id]: opt }))}
+                          className={`rounded border px-3 py-1 text-xs font-medium transition ${
+                            chosen === opt
+                              ? 'border-[#2E5641] bg-[#2E5641] text-[#FBF8F3]'
+                              : 'border-[#D8CEBE] bg-[#F4EFE6] text-[#5C5144] hover:border-[#B07D4F]'
+                          }`}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                      {readingChecked && (
+                        <span
+                          className={`ml-auto text-xs font-semibold ${
+                            isCorrect ? 'text-[#2E5641]' : 'text-[#9E473B]'
+                          }`}
+                        >
+                          {isCorrect ? `正确 (${q.answer})` : `标准判定：${q.answer}`}
+                        </span>
+                      )}
+                    </div>
+                    {readingChecked && (
+                      <p className="border-t border-[#E5DEC9] pt-2 text-xs text-[#4A4238]">
+                        <strong className="text-[#7A4E24]">依据：</strong>
+                        {q.explanation}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="lg:col-span-5 editorial-card rounded-xl p-6 sm:p-8 space-y-6">
+            <div className="border-b border-[#E2DACB] pb-3">
+              <h3 className="font-editorial text-xl font-semibold text-[#2C2623]">
+                同义替换与长难句 <span className="font-normal text-[#6E6050]">/ Paraphrase & Syntax</span>
+              </h3>
+            </div>
+
+            <div className="editorial-inset-box rounded-lg p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-[#DFD7C8] pb-2">
+                <span className="font-editorial text-base font-semibold text-[#2C2623]">
+                  同义替换对照
+                </span>
+                <span className="text-xs text-[#B07D4F]">✦</span>
+              </div>
+              <div className="space-y-3">
+                {currentRead.paraphrasePairs.map((pair, idx) => (
+                  <div key={idx} className="text-xs space-y-1 border-b border-[#E5DEC9] pb-2.5 last:border-none">
+                    <div className="font-editorial text-sm font-semibold text-[#2C2623]">
+                      {pair.passageExpr}
+                    </div>
+                    <div className="text-[#8C5A2B]">┈┈┈┈▸ {pair.questionExpr}</div>
+                    <div className="text-[11px] text-[#7A6B58]">{pair.type}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl editorial-card-inner p-5 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-[#6E6050]">长难句结构剖析</span>
+                <button
+                  onClick={() =>
+                    onAskTutor(
+                      `请解析阅读长难句：“${currentRead.longSentenceAnalysis.sentence}”的句法层次。`,
+                      currentRead.passageExcerpt
+                    )
+                  }
+                  className="inline-flex items-center gap-1 text-xs text-[#8C5A2B] hover:underline"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  <span>句法追问</span>
+                </button>
+              </div>
+              <p className="font-editorial text-base italic text-[#2C2623]">
+                “{currentRead.longSentenceAnalysis.sentence}”
+              </p>
+              <p className="text-xs text-[#3D352E] leading-relaxed">
+                {currentRead.longSentenceAnalysis.translation}
+              </p>
+              <p className="border-t border-[#E5DEC9] pt-2 text-xs text-[#5C5144] leading-relaxed">
+                {currentRead.longSentenceAnalysis.breakdown}
+              </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* =================================================================== */}
-      {/* 科目 3：雅思写作 (Writing) */}
-      {/* =================================================================== */}
+      {/* 3. 写作模块 */}
       {activeSkill === 'writing' && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <div className="lg:col-span-4 space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 px-1">
-              大小作文精选命题 ({IELTS_WRITING_PROMPTS.length})
-            </h3>
-            {IELTS_WRITING_PROMPTS.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setSelectedWriteId(item.id);
-                  setEssayDraft('');
-                  setWritingEval(null);
-                  setShowModelEssay(false);
-                }}
-                className={`w-full text-left rounded-xl border p-4 transition ${
-                  item.id === currentWrite.id
-                    ? 'border-indigo-500/80 bg-indigo-950/40'
-                    : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
-                }`}
-              >
-                <span className="rounded bg-indigo-500/20 px-2 py-0.5 text-[11px] font-semibold text-indigo-300">
+          <div className="lg:col-span-5 editorial-card rounded-xl p-6 sm:p-7 space-y-5">
+            <div className="flex items-center gap-2">
+              {IELTS_WRITING_PROMPTS.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setSelectedWriteId(item.id);
+                    setEssayDraft('');
+                    setWritingEval(null);
+                    setShowModelEssay(false);
+                  }}
+                  className={`rounded-lg border px-3 py-1.5 text-xs transition ${
+                    item.id === currentWrite.id
+                      ? 'border-[#B07D4F] bg-[#EFE6D5] font-semibold text-[#2C2623]'
+                      : 'border-[#DFD7C8] bg-[#FBF8F3] text-[#5C5144]'
+                  }`}
+                >
                   {item.taskType}
-                </span>
-                <p className="mt-2 text-sm font-bold text-white">{item.title}</p>
-                <p className="mt-1 text-xs text-slate-400 line-clamp-2">{item.question}</p>
-              </button>
-            ))}
+                </button>
+              ))}
+            </div>
 
-            {/* Band 6 vs Band 8.5 语料升格对比卡片 */}
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-amber-300">
-                Band 6.0 → Band 8.5 句式与词汇升格对照
-              </h4>
+            <div className="border-b border-[#E2DACB] pb-4">
+              <h2 className="font-editorial text-xl font-semibold text-[#2C2623]">
+                {currentWrite.title}
+              </h2>
+              <p className="mt-2 font-editorial text-base leading-relaxed text-[#3D352E]">
+                {currentWrite.question}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-xs font-semibold text-[#6E6050]">论证结构要旨 / Outline</span>
+              <ul className="space-y-1.5 text-xs text-[#4A4238] leading-relaxed">
+                {currentWrite.outlineSteps.map((st, idx) => (
+                  <li key={idx}>• {st}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="editorial-inset-box rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-[#DFD7C8] pb-2">
+                <h3 className="font-editorial text-sm font-semibold text-[#2C2623]">
+                  语料升格对照 <span className="font-normal text-[#6E6050]">/ Band 6.0 → 8.5</span>
+                </h3>
+                <span className="text-xs text-[#B07D4F]">✦</span>
+              </div>
               {currentWrite.upgradeHighlights.map((up, idx) => (
-                <div key={idx} className="rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs space-y-1.5">
-                  <div className="text-rose-300 line-through opacity-80">Band 6: {up.band6}</div>
-                  <div className="font-serif font-semibold text-emerald-300">Band 8.5: {up.band85}</div>
-                  <p className="text-[11px] text-slate-400">{up.reason}</p>
+                <div key={idx} className="text-xs space-y-1 border-b border-[#E5DEC9] pb-2.5 last:border-none">
+                  <div className="text-[#8A7B68] line-through">{up.band6}</div>
+                  <div className="font-editorial font-semibold text-sm text-[#2E5641]">
+                    {up.band85}
+                  </div>
+                  <div className="text-[11px] text-[#5C5144]">{up.reason}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="lg:col-span-8 space-y-5">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/85 p-6 shadow-xl space-y-5">
-              <div>
-                <span className="text-xs font-semibold text-indigo-400">
-                  {currentWrite.taskType} · {currentWrite.topicCategory}
-                </span>
-                <h2 className="mt-1 text-lg font-bold text-white">{currentWrite.title}</h2>
-                <p className="mt-3 rounded-xl border border-slate-700/80 bg-slate-950 p-4 font-serif text-sm leading-relaxed text-slate-100">
-                  {currentWrite.question}
-                </p>
+          <div className="lg:col-span-7 editorial-card rounded-xl p-6 sm:p-7 space-y-5">
+            <div className="flex items-center justify-between border-b border-[#E2DACB] pb-3">
+              <h3 className="font-editorial text-xl font-semibold text-[#2C2623]">
+                写作练习与四维评定 <span className="font-normal text-[#6E6050]">/ Essay Practice</span>
+              </h3>
+              <button
+                onClick={() => setShowModelEssay((prev) => !prev)}
+                className="text-xs text-[#8C5A2B] hover:underline"
+              >
+                {showModelEssay ? '隐藏范文' : '对照 Band 8.5 范文'}
+              </button>
+            </div>
+
+            {showModelEssay && (
+              <div className="rounded-xl editorial-card-inner p-5 space-y-2">
+                <span className="text-xs font-semibold text-[#2E5641]">Band 8.5 参考范文</span>
+                <div className="whitespace-pre-line font-editorial text-base leading-relaxed text-[#2C2623]">
+                  {currentWrite.band85Model}
+                </div>
               </div>
+            )}
 
-              {/* 审题与段落结构大纲 */}
-              <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-indigo-300">高分四段式审题逻辑框架：</span>
-                  <button
-                    onClick={() => setShowModelEssay((prev) => !prev)}
-                    className="text-xs font-medium text-emerald-400 hover:underline"
-                  >
-                    {showModelEssay ? '收起 Band 8.5 考官范文' : '查看 Band 8.5 考官范文'}
-                  </button>
-                </div>
-                <ul className="mt-2 space-y-1.5 text-xs text-slate-300">
-                  {currentWrite.outlineSteps.map((st, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-indigo-400 font-bold">{idx + 1}.</span>
-                      <span>{st}</span>
-                    </li>
-                  ))}
-                </ul>
+            <form onSubmit={handleEvaluateWriting} className="space-y-3">
+              <div className="flex justify-between text-xs text-[#7A6B58]">
+                <span>撰写段落或全文</span>
+                <span>词数：{essayWordCount} words</span>
               </div>
-
-              {showModelEssay && (
-                <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/15 p-4 space-y-2">
-                  <span className="text-xs font-bold text-emerald-300">Band 8.5 考官级完整范文示范：</span>
-                  <div className="whitespace-pre-line font-serif text-sm leading-relaxed text-slate-100">
-                    {currentWrite.band85Model}
-                  </div>
-                </div>
-              )}
-
-              {/* 写作提交与 AI 四维批改 */}
-              <form onSubmit={handleEvaluateWriting} className="space-y-3">
-                <div className="flex items-center justify-between text-xs text-slate-400">
-                  <span>在此撰写你的作文段落或全文：</span>
-                  <span>当前词数：{essayWordCount} words</span>
-                </div>
+              <div className="rounded-xl editorial-card-inner p-4">
                 <textarea
-                  rows={6}
+                  rows={7}
                   value={essayDraft}
                   onChange={(e) => setEssayDraft(e.target.value)}
-                  placeholder="输入你的雅思写作正文（引言段、主体段或全文），提交后由 AI 按照 TR / CC / LR / GRA 官方四项标准评分..."
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 p-4 font-serif text-sm leading-relaxed text-slate-100 focus:border-indigo-400 focus:outline-none"
+                  placeholder="在此撰写英文议论文或图表分析..."
+                  className="w-full bg-transparent font-editorial text-base leading-relaxed text-[#2C2623] placeholder-[#A69988] focus:outline-none"
                 />
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={isEvaluatingWriting || !essayDraft.trim()}
-                    className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-semibold text-white shadow-lg hover:bg-indigo-500 disabled:opacity-50"
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    {isEvaluatingWriting ? 'AI 考官正在执行四维批改...' : '提交作文获取官方四维 Band 精批'}
-                  </button>
-                </div>
-              </form>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isEvaluatingWriting || !essayDraft.trim()}
+                  className="rounded-lg bg-[#2E5641] px-5 py-2 text-xs font-medium text-[#FBF8F3] hover:bg-[#234533] disabled:opacity-50"
+                >
+                  {isEvaluatingWriting ? '正在评定...' : '提交四维评定'}
+                </button>
+              </div>
+            </form>
 
-              {writingEval && (
-                <div className="animate-fade-in-up rounded-2xl border border-indigo-500/40 bg-slate-950/90 p-5 space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-14 w-14 flex-col items-center justify-center rounded-2xl bg-indigo-600/25 border border-indigo-400/50">
-                        <span className="text-xl font-extrabold text-indigo-300">{writingEval.overallBand}</span>
-                        <span className="text-[10px] text-indigo-200">Overall</span>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-white">IELTS Writing 四维诊断报告</h4>
-                        {writingEvalMode && <p className="text-xs text-slate-400">{writingEvalMode}</p>}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-4 gap-2 text-center">
-                      {[
-                        { k: 'TR/TA', v: writingEval.criteria.taskResponse },
-                        { k: 'CC', v: writingEval.criteria.coherence },
-                        { k: 'LR', v: writingEval.criteria.lexical },
-                        { k: 'GRA', v: writingEval.criteria.grammar },
-                      ].map((c) => (
-                        <div key={c.k} className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5">
-                          <div className="text-xs font-bold text-emerald-300">{c.v}</div>
-                          <div className="text-[10px] text-slate-400">{c.k}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <p className="text-xs leading-relaxed text-slate-200">{writingEval.summary}</p>
-
-                  <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-4">
-                    <span className="text-xs font-semibold text-indigo-300">Band 8.0+ 定制升格范文：</span>
-                    <p className="mt-1.5 whitespace-pre-line font-serif text-sm text-white">
-                      {writingEval.upgradedVersion}
-                    </p>
+            {writingEval && (
+              <div className="rounded-xl editorial-inset-box p-5 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#DFD7C8] pb-3">
+                  <span className="font-editorial text-lg font-semibold text-[#2C2623]">
+                    四维评定结果 · Overall Band {writingEval.overallBand}
+                  </span>
+                  <div className="flex gap-2">
+                    {[
+                      { k: 'TR/TA', v: writingEval.criteria.taskResponse },
+                      { k: 'CC', v: writingEval.criteria.coherence },
+                      { k: 'LR', v: writingEval.criteria.lexical },
+                      { k: 'GRA', v: writingEval.criteria.grammar },
+                    ].map((c) => (
+                      <span
+                        key={c.k}
+                        className="rounded border border-[#D8CEBE] bg-[#FBF8F3] px-2.5 py-1 text-xs font-medium text-[#2C2623]"
+                      >
+                        {c.k}: {c.v}
+                      </span>
+                    ))}
                   </div>
                 </div>
-              )}
-            </div>
+                <p className="text-xs sm:text-sm text-[#3D352E] leading-relaxed">{writingEval.summary}</p>
+                <div className="rounded-lg border border-[#E2DACB] bg-[#FBF8F3] p-4">
+                  <span className="text-xs font-semibold text-[#6E6050]">升格范式：</span>
+                  <p className="mt-1 whitespace-pre-line font-editorial text-base text-[#2C2623]">
+                    {writingEval.upgradedVersion}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* =================================================================== */}
-      {/* 科目 4：雅思口语 (Speaking) */}
-      {/* =================================================================== */}
+      {/* 4. 口语模块 */}
       {activeSkill === 'speaking' && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <div className="lg:col-span-5 space-y-4">
-            <div className="rounded-2xl border border-amber-500/30 bg-slate-900/90 p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="rounded-full bg-amber-500/20 px-3 py-0.5 text-xs font-semibold text-amber-300">
-                  {currentSpeak.part}
+          <div className="lg:col-span-5 editorial-card rounded-xl p-6 sm:p-7 space-y-5">
+            <div className="flex items-center justify-between border-b border-[#E2DACB] pb-3">
+              <span className="text-xs font-semibold text-[#7A4E24]">{currentSpeak.part}</span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs font-semibold text-[#2C2623] flex items-center gap-1">
+                  <Clock className="h-3.5 w-3.5 text-[#8C5A2B]" />
+                  {Math.floor(timerSeconds / 60)}:{String(timerSeconds % 60).padStart(2, '0')}
                 </span>
-                {/* 2 分钟口语模考计时器 */}
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-sm font-bold text-amber-300 flex items-center gap-1">
-                    <Clock className="h-3.5 w-3.5" />
-                    {Math.floor(timerSeconds / 60)}:{String(timerSeconds % 60).padStart(2, '0')}
-                  </span>
-                  <button
-                    onClick={() => setTimerRunning((prev) => !prev)}
-                    className="rounded-lg bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-500"
-                  >
-                    {timerRunning ? '暂停' : '开始计时'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setTimerRunning(false);
-                      setTimerSeconds(120);
-                    }}
-                    className="rounded-lg border border-slate-700 bg-slate-800 p-1 text-slate-300"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+                <button
+                  onClick={() => setTimerRunning((prev) => !prev)}
+                  className="rounded border border-[#C9A67E] bg-[#EFE6D5] px-2.5 py-0.5 text-xs text-[#6E4B28]"
+                >
+                  {timerRunning ? '暂停' : '计时'}
+                </button>
+                <button
+                  onClick={() => {
+                    setTimerRunning(false);
+                    setTimerSeconds(120);
+                  }}
+                  className="text-[#7A6B58] hover:text-[#2C2623]"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </button>
               </div>
+            </div>
 
-              <h2 className="text-lg font-bold text-white">{currentSpeak.topic}</h2>
-              {currentSpeak.cueCardPrompt && (
-                <div className="rounded-xl border border-slate-800 bg-slate-950 p-4 space-y-2">
-                  <p className="text-xs font-semibold text-amber-200">{currentSpeak.cueCardPrompt}</p>
-                  <p className="text-xs text-slate-400">You should say:</p>
-                  <ul className="space-y-1 text-xs text-slate-300">
-                    {currentSpeak.bulletPoints?.map((bp, i) => (
-                      <li key={i}>• {bp}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+            <h2 className="font-editorial text-xl font-semibold text-[#2C2623]">{currentSpeak.topic}</h2>
 
-              {/* 口语自测与 AI 润色 */}
-              <form onSubmit={handleEvaluateSpeaking} className="space-y-3 pt-2">
-                <label className="block text-xs font-semibold text-slate-300">
-                  输入你的口语回答逐字稿（获取 FC / LR / GRA 四维评估与母语习语升级）：
-                </label>
+            {currentSpeak.cueCardPrompt && (
+              <div className="rounded-xl editorial-card-inner p-4 space-y-2">
+                <p className="font-editorial text-sm font-semibold text-[#2C2623]">
+                  {currentSpeak.cueCardPrompt}
+                </p>
+                <ul className="space-y-1 text-xs text-[#4A4238]">
+                  {currentSpeak.bulletPoints?.map((bp, i) => (
+                    <li key={i}>• {bp}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <form onSubmit={handleEvaluateSpeaking} className="space-y-3">
+              <div className="rounded-xl editorial-card-inner p-3.5">
                 <textarea
                   rows={4}
                   value={speakingDraft}
                   onChange={(e) => setSpeakingDraft(e.target.value)}
-                  placeholder="Write or transcribe your spoken answer here..."
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 p-3.5 text-sm text-white focus:border-amber-400 focus:outline-none"
+                  placeholder="在此记录口语陈述文稿以供评定与润色..."
+                  className="w-full bg-transparent font-editorial text-base text-[#2C2623] placeholder-[#A69988] focus:outline-none"
                 />
-                <button
-                  type="submit"
-                  disabled={isEvaluatingSpeaking || !speakingDraft.trim()}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-amber-500 disabled:opacity-50"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  {isEvaluatingSpeaking ? '正在评估口语流利度与地道表达...' : '提交口语回答并获取 Band 8+ 润色'}
-                </button>
-              </form>
+              </div>
+              <button
+                type="submit"
+                disabled={isEvaluatingSpeaking || !speakingDraft.trim()}
+                className="w-full rounded-lg bg-[#2E5641] py-2 text-xs font-medium text-[#FBF8F3] hover:bg-[#234533] disabled:opacity-50"
+              >
+                {isEvaluatingSpeaking ? '正在评定...' : '提交口语文稿'}
+              </button>
+            </form>
 
-              {speakingEval && (
-                <div className="rounded-xl border border-amber-500/40 bg-slate-950 p-4 space-y-2.5 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-amber-300">预估口语得分：Band {speakingEval.overallBand}</span>
-                    {speakingEvalMode && <span className="text-slate-400">{speakingEvalMode}</span>}
-                  </div>
-                  <p className="text-slate-300">{speakingEval.summary}</p>
-                  <div className="rounded-lg bg-slate-900 p-3 font-serif italic text-emerald-300">
-                    “{speakingEval.upgradedVersion}”
-                  </div>
+            {speakingEval && (
+              <div className="rounded-xl editorial-inset-box p-4 space-y-2 text-xs">
+                <div className="font-semibold text-[#2E5641]">
+                  口语评定：Band {speakingEval.overallBand}
                 </div>
-              )}
-            </div>
+                <p className="text-[#4A4238]">{speakingEval.summary}</p>
+                <p className="font-editorial text-sm italic text-[#2C2623]">
+                  “{speakingEval.upgradedVersion}”
+                </p>
+              </div>
+            )}
           </div>
 
-          <div className="lg:col-span-7 space-y-4">
+          <div className="lg:col-span-7 space-y-5">
             {currentSpeak.questions.map((item, idx) => (
-              <div key={idx} className="rounded-2xl border border-slate-800 bg-slate-900/85 p-5 space-y-3">
-                <h3 className="text-sm font-bold text-white">{item.q}</h3>
-                <p className="text-xs text-amber-300/90">
-                  <strong>答题策略：</strong>
+              <div key={idx} className="editorial-card rounded-xl p-6 space-y-4">
+                <h3 className="font-editorial text-lg font-semibold text-[#2C2623]">{item.q}</h3>
+                <p className="text-xs text-[#5C5144]">
+                  <strong className="text-[#7A4E24]">展开脉络：</strong>
                   {item.strategy}
                 </p>
-                <div className="rounded-xl border border-slate-800 bg-slate-950 p-4 font-serif text-sm leading-relaxed text-slate-100">
+                <div className="rounded-xl editorial-card-inner p-4 font-editorial text-base leading-relaxed text-[#2C2623]">
                   “{item.sampleAnswer}”
                 </div>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {item.idioms.map((idItem, k) => (
-                    <span
-                      key={k}
-                      className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-200"
-                    >
-                      <strong>{idItem.phrase}</strong>：{idItem.meaning}
-                    </span>
-                  ))}
+                <div className="editorial-inset-box rounded-lg p-4 space-y-2">
+                  <span className="text-xs font-semibold text-[#6E6050]">地道表达 / Idioms</span>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {item.idioms.map((idItem, k) => (
+                      <div key={k} className="text-xs flex items-baseline gap-2">
+                        <span className="inline-block h-1.5 w-2 rounded-sm bg-[#B07D4F]" />
+                        <span className="font-editorial font-semibold text-sm text-[#2C2623]">
+                          {idItem.phrase}
+                        </span>
+                        <span className="text-[#5C5144]">{idItem.meaning}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             ))}

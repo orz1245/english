@@ -1,15 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import {
-  BookOpen,
-  Cloud,
-  Database,
-  GitBranch,
-  GraduationCap,
-  Languages,
-  MessageSquare,
-  Settings,
-  Sparkles,
-} from 'lucide-react';
 import { AiConfigModal, AiTutorDrawer } from './components/AiConfigModal';
 import { GrammarModule } from './components/GrammarModule';
 import { IeltsModule } from './components/IeltsModule';
@@ -31,8 +20,8 @@ export const App: React.FC = () => {
   const [aiConfig, setAiConfig] = useState<AIConfig>(() => loadLocalAIConfig() || DEFAULT_AI_CONFIG);
   const [progress, setProgress] = useState<UserProgress>(() => loadLocalProgress() || DEFAULT_USER_PROGRESS);
   const [storageBackend, setStorageBackend] = useState<string>('d1');
-  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
+  // 后台 AI 配置面板默认不向普通用户展示，仅通过 URL 参数 (?admin=1 / #admin) 或管理员快捷键 Ctrl/Cmd + Shift + A 呼出
   const [isAiModalOpen, setIsAiModalOpen] = useState<boolean>(false);
   const [isTutorOpen, setIsTutorOpen] = useState<boolean>(false);
   const [tutorQuestion, setTutorQuestion] = useState<string>('');
@@ -43,15 +32,35 @@ export const App: React.FC = () => {
       setStorageBackend(res.storageBackend);
       setAiConfig(res.aiConfig);
       setProgress(res.progress);
-      setLastSyncedAt(res.updatedAt);
     });
+
+    const checkAdminRoute = () => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('admin') === '1' || window.location.hash === '#admin') {
+        setIsAiModalOpen(true);
+      }
+    };
+    checkAdminRoute();
+    window.addEventListener('hashchange', checkAdminRoute);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        setIsAiModalOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('hashchange', checkAdminRoute);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   const handleSaveAiConfig = async (newConfig: AIConfig) => {
     setAiConfig(newConfig);
     const res = await pushStateToCloud(newConfig, progress);
     setStorageBackend(res.storageBackend);
-    setLastSyncedAt(res.updatedAt);
   };
 
   const handleMarkCompleted = async (category: 'grammar' | 'translation' | 'ielts', itemId: string) => {
@@ -69,7 +78,6 @@ export const App: React.FC = () => {
     setProgress(nextProgress);
     const res = await pushStateToCloud(aiConfig, nextProgress);
     setStorageBackend(res.storageBackend);
-    setLastSyncedAt(res.updatedAt);
   };
 
   const handleAskTutor = (prefillQuestion: string, contextText: string) => {
@@ -78,112 +86,58 @@ export const App: React.FC = () => {
     setIsTutorOpen(true);
   };
 
-  const totalMastered =
-    progress.completedGrammarIds.length +
-    progress.completedTranslationIds.length +
-    progress.completedIeltsIds.length;
-
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      {/* 顶部全局导航栏 */}
-      <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-3.5 sm:px-6">
-          {/* 品牌 Logo */}
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/20">
-              <BookOpen className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-base font-extrabold tracking-tight text-white">LinguaForge</span>
-                <span className="rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2 py-0.5 text-[10px] font-semibold text-indigo-300">
-                  Cloudflare Workers
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400">
-                可视化句法拆解 · 文学影视分级翻译 · 雅思四科 AI 精研平台
-              </p>
-            </div>
+    <div className="min-h-screen bg-[#FBF8F3] text-[#2C2623] flex flex-col">
+      {/* 顶部书房眉栏（严格还原方向一：左侧深林绿衬线体品牌名，中央平级无编号三栏导航，无多余按钮） */}
+      <header className="sticky top-0 z-30 border-b border-[#E2DACB] bg-[#FBF8F3]/95 backdrop-blur-xs">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 sm:px-8">
+          <div className="py-4">
+            <span className="font-editorial text-2xl sm:text-3xl font-semibold tracking-tight text-[#234533]">
+              LinguaForge
+            </span>
           </div>
 
-          {/* 三大核心模块切换 Tab */}
-          <nav className="flex items-center gap-1.5 rounded-2xl border border-slate-800 bg-slate-900/90 p-1.5">
-            <button
-              onClick={() => setActiveModule('grammar')}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
-                activeModule === 'grammar'
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
-              }`}
-            >
-              <GitBranch className="h-4 w-4" />
-              <span>1. 英语语法拆解</span>
-            </button>
-
-            <button
-              onClick={() => setActiveModule('translation')}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
-                activeModule === 'translation'
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
-              }`}
-            >
-              <Languages className="h-4 w-4" />
-              <span>2. 文学影视翻译</span>
-            </button>
-
-            <button
-              onClick={() => setActiveModule('ielts')}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
-                activeModule === 'ielts'
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
-              }`}
-            >
-              <GraduationCap className="h-4 w-4" />
-              <span>3. 雅思四科专训</span>
-            </button>
+          {/* 平级无编号三模块导航 */}
+          <nav className="flex items-stretch">
+            {[
+              { id: 'grammar', label: '语法解析' },
+              { id: 'translation', label: '句子翻译' },
+              { id: 'ielts', label: '雅思备考' },
+            ].map((tab) => {
+              const isActive = activeModule === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveModule(tab.id as ActiveModule)}
+                  className={`relative border-l last:border-r border-[#E8E1D3] px-5 sm:px-8 py-5 text-sm sm:text-base transition-colors ${
+                    isActive
+                      ? 'bg-[#F6F1E7] font-semibold text-[#2C2623]'
+                      : 'text-[#6E6050] hover:bg-[#F7F3EB] hover:text-[#2C2623]'
+                  }`}
+                >
+                  <span className="font-editorial tracking-wide">{tab.label}</span>
+                  {isActive && (
+                    <span className="absolute inset-x-0 bottom-0 h-[3px] bg-[#B07D4F]" />
+                  )}
+                </button>
+              );
+            })}
           </nav>
 
-          {/* 右侧：持久化状态 + AI 配置管理 + 随堂答疑 */}
-          <div className="flex items-center gap-2.5">
-            <div
-              className="hidden xl:flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-300"
-              title={lastSyncedAt ? `最近云端同步时间：${lastSyncedAt}` : 'Cloudflare 边缘持久化已就绪'}
-            >
-              <Database className="h-3.5 w-3.5 text-emerald-400" />
-              <span>存储：{storageBackend.toUpperCase()}</span>
-              <span className="text-slate-600">|</span>
-              <span className="text-indigo-300 font-semibold">已掌握 {totalMastered} 项</span>
-            </div>
-
-            <button
-              onClick={() => setIsAiModalOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-200 hover:border-indigo-500/50 hover:bg-slate-800"
-            >
-              <Settings className="h-3.5 w-3.5 text-indigo-400" />
-              <span>AI 配置 ({aiConfig.model})</span>
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  aiConfig.apiKey ? 'bg-emerald-400' : 'bg-amber-400'
-                }`}
-                title={aiConfig.apiKey ? '已配置自定义 API Key' : '当前使用服务端默认密钥或离线启发式引擎'}
-              />
-            </button>
-
+          {/* 右侧留白平衡与极简释疑入口 */}
+          <div className="hidden sm:flex items-center justify-end w-28">
             <button
               onClick={() => setIsTutorOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-3.5 py-2 text-xs font-semibold text-white shadow-md hover:from-indigo-500 hover:to-purple-500"
+              className="rounded-lg border border-[#D8CEBE] bg-[#F4EFE6] px-3 py-1.5 font-editorial text-xs font-medium text-[#5C5144] transition hover:border-[#B07D4F] hover:text-[#2C2623]"
             >
-              <MessageSquare className="h-3.5 w-3.5" />
-              <span>AI 答疑助教</span>
+              学术释疑
             </button>
           </div>
         </div>
       </header>
 
-      {/* 主内容容器 */}
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
+      {/* 主体书页内容容器 */}
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-8">
         {activeModule === 'grammar' && (
           <GrammarModule
             aiConfig={aiConfig}
@@ -212,44 +166,34 @@ export const App: React.FC = () => {
         )}
       </main>
 
-      {/* 底部架构与持久化信息栏 */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-4 text-center text-xs text-slate-500">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-6 sm:flex-row">
-          <span>
-            LinguaForge · 兼容 Cloudflare Workers Runtime (Static Assets + D1/KV Persistence + OpenAI Proxy)
-          </span>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setIsAiModalOpen(true)}
-              className="text-indigo-400 hover:underline flex items-center gap-1"
-            >
-              <Cloud className="h-3.5 w-3.5" />
-              配置 OpenAI / DeepSeek / 通义千问代理密钥
-            </button>
-          </div>
+      {/* 极简书页页脚 */}
+      <footer className="border-t border-[#E8E1D3] bg-[#FBF8F3] py-5 text-center font-editorial text-xs text-[#8A7B68]">
+        <div className="mx-auto max-w-6xl px-6">
+          <span>LinguaForge · 英语语法解析、文学名著译注与雅思学术备考</span>
         </div>
       </footer>
 
-      {/* AI 配置管理弹窗 */}
+      {/* 隐藏式后台 AI 配置管理面板（仅管理员通过 ?admin=1、#admin 或 Ctrl/Cmd + Shift + A 呼出） */}
       <AiConfigModal
         isOpen={isAiModalOpen}
-        onClose={() => setIsAiModalOpen(false)}
+        onClose={() => {
+          setIsAiModalOpen(false);
+          if (window.location.hash === '#admin') {
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          }
+        }}
         config={aiConfig}
         storageBackend={storageBackend}
         onSaveConfig={handleSaveAiConfig}
       />
 
-      {/* AI 全局答疑侧边抽屉 */}
+      {/* 学术释疑侧栏 */}
       <AiTutorDrawer
         isOpen={isTutorOpen}
         onClose={() => setIsTutorOpen(false)}
         aiConfig={aiConfig}
         initialQuestion={tutorQuestion}
         contextInfo={tutorContext}
-        onOpenAiSettings={() => {
-          setIsTutorOpen(false);
-          setIsAiModalOpen(true);
-        }}
       />
     </div>
   );

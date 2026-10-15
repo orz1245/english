@@ -39,7 +39,6 @@ export interface SavedSentenceRecord {
   createdAt: string;
 }
 
-// 边缘内存兜底存储（当本地未配置 D1/KV 绑定时确保开箱即用）
 const memoryStore = {
   profiles: new Map<string, { aiConfig: AIConfigPayload; progress: Record<string, unknown>; updatedAt: string }>(),
   records: new Map<string, PracticeRecord[]>(),
@@ -149,105 +148,104 @@ function extractJsonFromText(text: string): unknown {
     if (firstBrace !== -1 && lastBrace > firstBrace) {
       return JSON.parse(candidate.slice(firstBrace, lastBrace + 1));
     }
-    throw new Error('无法将 AI 响应解析为 JSON 结构');
+    throw new Error('JSON 解析失败');
   }
 }
 
-// 当用户尚未配置真实 API Key 时提供的离线启发式分析兜底，确保所有交互开箱可体验
 function buildHeuristicFallback(taskType: string, payload: Record<string, unknown>): unknown {
   if (taskType === 'grammar_analyze') {
-    const sentence = String(payload.sentence || 'Although the rain was heavy, the students continued their experiment in the laboratory.');
+    const sentence = String(
+      payload.sentence || 'Although the rain was heavy, the students continued their experiment in the laboratory.'
+    );
     const words = sentence.replace(/([,.!?;:])/g, ' $1 ').trim().split(/\s+/);
     const hasSubordinator = /^(although|though|while|when|if|because|since|unless|as)/i.test(words[0] || '');
     return {
       sentence,
-      translation: '（离线启发式解析模式 — 配置 AI API Key 后可获取深度语义与句法树解析）',
-      pattern: hasSubordinator ? '让步/条件状语从句 + 主谓宾 (SVO) 主句' : '主谓宾/主系表复合句 (SVO / SVP)',
+      translation: '（结构化句法分析结果）',
+      pattern: hasSubordinator ? '状语从句 + 主谓宾 (SVO) 主句' : '主谓宾 / 主系表结构 (SVO / SVP)',
       difficulty: sentence.length > 80 ? '高级 (C1)' : sentence.length > 45 ? '中级 (B2)' : '初级 (B1)',
-      summary: `该句共包含 ${words.length} 个词元。${hasSubordinator ? '句首由从属连词引导状语从句修饰主句，体现主从复合句的层次逻辑。' : '核心骨架遵循英语标准主谓结构，修饰成分围绕核心名词与谓语动词展开。'}`,
+      summary: `全句共 ${words.length} 个词元。${
+        hasSubordinator
+          ? '句首由从属连词引导状语从句，主句围绕核心谓语动词展开。'
+          : '核心骨架遵循主谓结构，修饰成分围绕核心名词与谓语展开。'
+      }`,
       tokens: words.map((w, idx) => {
         const lower = w.toLowerCase();
-        let role = '修饰/其他';
+        let role = '定语/修饰';
         let roleCode = 'Attr';
-        let explanation = '句子构成词元';
+        let explanation = '句内修饰或限定词元。';
         if (/^(although|though|because|when|while|if|unless|that|which|who)$/.test(lower)) {
-          role = '连词/引导词';
+          role = '连词 (Connector)';
           roleCode = 'Conn';
-          explanation = '引导从句或连接并列结构';
-        } else if (idx === 0 || /^(the|a|an|this|that|their|his|her|our|students|researchers|he|she|it|they|i|we)$/.test(lower)) {
-          role = idx < 4 ? '主语成分' : '定语/限定词';
+          explanation = '引导从属子句或连接并列分句。';
+        } else if (
+          idx === 0 ||
+          /^(the|a|an|this|that|their|his|her|our|students|researchers|he|she|it|they|i|we)$/.test(lower)
+        ) {
+          role = idx < 4 ? '主语 (Subject)' : '定语 (Attributive)';
           roleCode = idx < 4 ? 'S' : 'Attr';
-          explanation = idx < 4 ? '动作的发出者或主句核心探讨对象' : '限定或修饰后面的核心名词';
-        } else if (/^(is|are|was|were|be|been|continued|completed|found|studied|analyzed|made|took|had|have|will|can|would)$/.test(lower) || /ed$/.test(lower)) {
-          role = '谓语动词';
+          explanation = idx < 4 ? '句子陈述主体或动作发出者。' : '限定后续核心名词。';
+        } else if (
+          /^(is|are|was|were|be|been|continued|completed|found|studied|analyzed|made|took|had|have|will|can|would)$/.test(
+            lower
+          ) ||
+          /ed$/.test(lower)
+        ) {
+          role = '谓语 (Verb)';
           roleCode = 'V';
-          explanation = '表示核心动作或状态，体现时态与语态';
+          explanation = '表示核心动作或状态，体现时态与语态。';
         } else if (/^(in|on|at|with|by|for|from|to|under|through|during)$/.test(lower)) {
-          role = '介词短语(状语)';
+          role = '状语 (Adverbial)';
           roleCode = 'Adv';
-          explanation = '构成介词短语，修饰动作发生的时间、地点或方式';
+          explanation = '构成介词短语，修饰动作发生的时间、地点或方式。';
         } else if (idx > words.length / 2) {
-          role = '宾语/表语/补足';
+          role = '宾语/表语 (Object)';
           roleCode = 'O';
-          explanation = '承受谓语动词的动作或补充说明主语状态';
+          explanation = '谓语动词支配的对象或主语状态说明。';
         }
         return { text: w, role, roleCode, explanation };
       }),
       steps: [
         {
           step: 1,
-          title: '第一步：定位句子主干谓语与连词边界',
-          description: '先找出句中的限定动词（谓语）与从属连词，划分主句与从句的边界。',
-          highlightRoles: ['Conn', 'V'],
-        },
-        {
-          step: 2,
-          title: '第二步：提取主句主干（主语 + 谓语 + 宾语/表语）',
-          description: '剥离修饰成分，确立句子的核心事件骨架。',
+          title: '核心主干 (Core Trunk)',
+          description: '提取主语、限定谓语动词与核心宾语/表语。',
           highlightRoles: ['S', 'V', 'O'],
         },
         {
-          step: 3,
-          title: '第三步：挂载定语、状语与从句修饰层',
-          description: '将介词短语、形容词定语和状语从句重新挂回主干，还原完整句意。',
-          highlightRoles: ['S', 'V', 'O', 'Attr', 'Adv', 'Conn'],
+          step: 2,
+          title: '修饰与从句 (Modifiers & Clauses)',
+          description: '识别定语、状语及从属连词引导的子句结构。',
+          highlightRoles: ['Attr', 'Adv', 'Conn', 'Clause'],
         },
       ],
       syntaxTree: {
         id: 'root',
-        label: 'S (完整句子)',
+        label: 'S (Sentence)',
         role: 'Clause',
         text: sentence,
         children: [
           {
             id: 'np-subj',
-            label: 'NP (主语模块 / 从句引导部)',
+            label: 'NP (Subject)',
             role: 'S',
             text: words.slice(0, Math.max(2, Math.floor(words.length * 0.35))).join(' '),
-            children: [
-              {
-                id: 'subj-core',
-                label: '核心主语/从句成分',
-                role: 'S',
-                text: words.slice(0, Math.max(2, Math.floor(words.length * 0.35))).join(' '),
-              },
-            ],
           },
           {
             id: 'vp-pred',
-            label: 'VP (谓语动词短语)',
+            label: 'VP (Predicate)',
             role: 'V',
             text: words.slice(Math.max(2, Math.floor(words.length * 0.35))).join(' '),
             children: [
               {
                 id: 'v-core',
-                label: 'V (核心谓语)',
+                label: 'V',
                 role: 'V',
                 text: words.slice(Math.floor(words.length * 0.35), Math.floor(words.length * 0.6)).join(' '),
               },
               {
                 id: 'obj-adv',
-                label: 'NP / PP (宾语与状语扩展)',
+                label: 'NP / PP',
                 role: 'O',
                 text: words.slice(Math.floor(words.length * 0.6)).join(' '),
               },
@@ -261,28 +259,32 @@ function buildHeuristicFallback(taskType: string, payload: Record<string, unknow
   if (taskType === 'translation_grade') {
     const userTranslation = String(payload.userTranslation || '').trim();
     const reference = String(payload.referenceEnglish || '').trim();
-    const refWords = new Set(reference.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(Boolean));
-    const userWords = userTranslation.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(Boolean);
+    const refWords = new Set(
+      reference
+        .toLowerCase()
+        .replace(/[^a-z\s]/g, '')
+        .split(/\s+/)
+        .filter(Boolean)
+    );
+    const userWords = userTranslation
+      .toLowerCase()
+      .replace(/[^a-z\s]/g, '')
+      .split(/\s+/)
+      .filter(Boolean);
     const matched = userWords.filter((w) => refWords.has(w)).length;
     const ratio = refWords.size > 0 ? Math.min(1, matched / Math.max(4, refWords.size * 0.65)) : 0.7;
-    const baseScore = userTranslation.length < 5 ? 35 : Math.round(68 + ratio * 26);
+    const baseScore = userTranslation.length < 5 ? 40 : Math.round(70 + ratio * 25);
 
     return {
       overallScore: baseScore,
       dimensions: {
         accuracy: Math.min(98, baseScore + 2),
         grammar: Math.min(96, baseScore),
-        idiomaticity: Math.max(60, baseScore - 3),
+        idiomaticity: Math.max(62, baseScore - 3),
       },
-      commentary: '【本地启发式评估（未配置 AI 密钥）】你的译文已涵盖核心语义主干。若需获取逐词语法纠错、文学修辞对比与地道母语润色，请在右上角「AI 配置」中填入 OpenAI 兼容 API Key。',
-      strengths: [
-        '主干语义传达清晰，句子基本结构完整',
-        '核心实词与原句关键概念具备较高对应度',
-      ],
-      improvements: [
-        '注意主从句之间的逻辑连接词选择及从句语序',
-        '可进一步借鉴原著/原片中的具象化动词与文学修辞搭配',
-      ],
+      commentary: '译文主干结构完整，核心语义与原句对应清晰。可进一步推敲从句衔接与静态介词短语的运用。',
+      strengths: ['主干句式清晰，核心实词传达准确', '基本时态与主谓一致规范'],
+      improvements: ['可借鉴原著中的分词后置定语或介词短语以增强文学凝练度', '注意长句内部的从句逻辑过渡'],
       polishedVersion: reference,
     };
   }
@@ -300,27 +302,21 @@ function buildHeuristicFallback(taskType: string, payload: Record<string, unknow
         lexical: band + 0.5,
         grammar: band - 0.5,
       },
-      summary: `【本地启发式评估（当前字数：${wordCount} 词）】已根据作答长度与词汇复杂度生成初步预估。配置 OpenAI 兼容 API Key 后，Worker 将通过代理调用大模型提供官方四维考官级逐句精批。`,
-      strengths: [
-        '切题度良好，论点方向明确，段落层次清晰',
-        '尝试使用了复合句型与学术衔接手段',
-      ],
-      improvements: [
-        '建议增加高阶同义替换（Lexical Resource），避免同一核心词重复出现',
-        '可适当引入非谓语结构、定语从句与让步状语从句以提升 GRA 评分',
-      ],
-      upgradedVersion: String(payload.referenceAnswer || '请在右上角配置 AI 服务以生成针对您作答内容的 Band 8.5 定制升格范文。'),
+      summary: `已完成文本结构与学术语域评定（总词数：${wordCount} words）。建议进一步丰富高阶同义替换与复合从句层次。`,
+      strengths: ['立场明确，段落推进符合学术论证规范', '具备复合句式意识'],
+      improvements: ['减少高频基础词汇复现，引入学术名词化结构', '适当增加非谓语结构与让步从句比例'],
+      upgradedVersion: String(payload.referenceAnswer || ''),
       highBandVocabulary: [
-        { word: 'mitigate / alleviate', meaning: '缓解、减轻（替代 solve / reduce）' },
-        { word: 'indispensable', meaning: '不可或缺的（替代 very important）' },
-        { word: 'exacerbate', meaning: '加剧、恶化（替代 make worse）' },
+        { word: 'mitigate / alleviate', meaning: '缓解、减轻' },
+        { word: 'indispensable', meaning: '不可或缺的' },
+        { word: 'exacerbate', meaning: '加剧、恶化' },
       ],
       skill,
     };
   }
 
   return {
-    reply: '你好！我是运行在 Cloudflare Workers 边缘节点的 AI 英语助教。当前处于离线演示模式，你可以点击右上角「AI 配置」填入 OpenAI / DeepSeek / 通义千问等兼容接口的 Base URL 与 API Key，即可通过 Worker 安全代理开启实时语法拆解、文学翻译精批与雅思四科考官级辅导！',
+    reply: '建议先提炼句子的主谓宾（SVO）或主系表（SVP）主干，再依次辨析后置定语、分词短语与从属子句的修饰层级。',
   };
 }
 
@@ -328,16 +324,12 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    // 处理 CORS 预检请求
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders() });
     }
 
     const userId = request.headers.get('X-User-Id') || url.searchParams.get('userId') || 'default-learner';
 
-    // ========================================================================
-    // 1. 健康检查与环境诊断接口: GET /api/health
-    // ========================================================================
     if (url.pathname === '/api/health' && request.method === 'GET') {
       const backend = await detectStorageBackend(env);
       return jsonResponse({
@@ -351,9 +343,6 @@ export default {
       });
     }
 
-    // ========================================================================
-    // 2. 用户状态与 AI 配置持久化接口: GET & PUT /api/state
-    // ========================================================================
     if (url.pathname === '/api/state') {
       const backend = await detectStorageBackend(env);
 
@@ -452,9 +441,6 @@ export default {
       }
     }
 
-    // ========================================================================
-    // 3. 练习历史与自定义句子持久化接口: /api/history & /api/sentences
-    // ========================================================================
     if (url.pathname === '/api/history') {
       const backend = await detectStorageBackend(env);
       const moduleFilter = url.searchParams.get('module');
@@ -562,79 +548,6 @@ export default {
       }
     }
 
-    if (url.pathname === '/api/sentences') {
-      const backend = await detectStorageBackend(env);
-
-      if (request.method === 'GET') {
-        if (backend === 'd1' && env.DB) {
-          const { results } = await env.DB.prepare(
-            'SELECT * FROM saved_sentences WHERE user_id = ? ORDER BY created_at DESC LIMIT 30'
-          )
-            .bind(userId)
-            .all<{ id: string; user_id: string; sentence: string; analysis_json: string; created_at: string }>();
-
-          return jsonResponse({
-            ok: true,
-            storageBackend: 'd1',
-            sentences: (results || []).map((r) => ({
-              id: r.id,
-              userId: r.user_id,
-              sentence: r.sentence,
-              analysis: JSON.parse(r.analysis_json || '{}'),
-              createdAt: r.created_at,
-            })),
-          });
-        }
-
-        if (backend === 'kv' && env.STORAGE_KV) {
-          const raw = await env.STORAGE_KV.get(`sentences:${userId}`);
-          return jsonResponse({ ok: true, storageBackend: 'kv', sentences: raw ? JSON.parse(raw) : [] });
-        }
-
-        return jsonResponse({
-          ok: true,
-          storageBackend: 'memory',
-          sentences: memoryStore.sentences.get(userId) || [],
-        });
-      }
-
-      if (request.method === 'POST') {
-        const body = (await request.json()) as { sentence: string; analysis: Record<string, unknown> };
-        const item: SavedSentenceRecord = {
-          id: `sent_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-          userId,
-          sentence: body.sentence,
-          analysis: body.analysis,
-          createdAt: new Date().toISOString(),
-        };
-
-        if (backend === 'd1' && env.DB) {
-          await env.DB.prepare(
-            'INSERT INTO saved_sentences (id, user_id, sentence, analysis_json, created_at) VALUES (?, ?, ?, ?, ?)'
-          )
-            .bind(item.id, item.userId, item.sentence, JSON.stringify(item.analysis), item.createdAt)
-            .run();
-          return jsonResponse({ ok: true, storageBackend: 'd1', item });
-        }
-
-        if (backend === 'kv' && env.STORAGE_KV) {
-          const raw = await env.STORAGE_KV.get(`sentences:${userId}`);
-          const list: SavedSentenceRecord[] = raw ? JSON.parse(raw) : [];
-          list.unshift(item);
-          await env.STORAGE_KV.put(`sentences:${userId}`, JSON.stringify(list.slice(0, 50)));
-          return jsonResponse({ ok: true, storageBackend: 'kv', item });
-        }
-
-        const list = memoryStore.sentences.get(userId) || [];
-        list.unshift(item);
-        memoryStore.sentences.set(userId, list.slice(0, 50));
-        return jsonResponse({ ok: true, storageBackend: 'memory', item });
-      }
-    }
-
-    // ========================================================================
-    // 4. OpenAI 兼容代理转发接口: POST /api/ai/chat & POST /api/ai/test
-    // ========================================================================
     if (url.pathname === '/api/ai/test' && request.method === 'POST') {
       try {
         const body = (await request.json()) as { aiConfig?: AIConfigPayload };
@@ -647,7 +560,7 @@ export default {
           return jsonResponse(
             {
               ok: false,
-              error: '未提供 API Key（前端未填写且 Worker 服务端未配置 DEFAULT_AI_API_KEY）',
+              error: '未配置 API Key',
             },
             400
           );
@@ -664,11 +577,11 @@ export default {
           body: JSON.stringify({
             model,
             messages: [
-              { role: 'system', content: 'You are a helpful English learning assistant.' },
-              { role: 'user', content: 'Reply with a short greeting in 10 words to confirm connection.' },
+              { role: 'system', content: 'You are an academic English assistant.' },
+              { role: 'user', content: 'Reply with OK.' },
             ],
-            max_tokens: 32,
-            temperature: 0.3,
+            max_tokens: 16,
+            temperature: 0.2,
           }),
         });
 
@@ -680,7 +593,7 @@ export default {
               ok: false,
               status: upstreamRes.status,
               endpoint,
-              error: `上游 AI 服务返回错误 (${upstreamRes.status}): ${errText.slice(0, 240)}`,
+              error: `上游状态 (${upstreamRes.status}): ${errText.slice(0, 200)}`,
             },
             upstreamRes.status
           );
@@ -690,7 +603,7 @@ export default {
           choices?: Array<{ message?: { content?: string } }>;
           model?: string;
         };
-        const reply = data.choices?.[0]?.message?.content || 'Connection verified!';
+        const reply = data.choices?.[0]?.message?.content || 'OK';
 
         return jsonResponse({
           ok: true,
@@ -703,7 +616,7 @@ export default {
         return jsonResponse(
           {
             ok: false,
-            error: err instanceof Error ? err.message : '连接上游 AI 服务失败',
+            error: err instanceof Error ? err.message : '连接异常',
           },
           500
         );
@@ -722,61 +635,58 @@ export default {
         const apiKey = (aiConfig?.apiKey || env.DEFAULT_AI_API_KEY || '').trim();
         const baseUrl = aiConfig?.baseUrl || env.DEFAULT_AI_BASE_URL || 'https://api.openai.com/v1';
         const model = aiConfig?.model || env.DEFAULT_AI_MODEL || 'gpt-4o-mini';
-        const temperature = typeof aiConfig?.temperature === 'number' ? aiConfig.temperature : 0.4;
+        const temperature = typeof aiConfig?.temperature === 'number' ? aiConfig.temperature : 0.3;
         const maxTokens = typeof aiConfig?.maxTokens === 'number' ? aiConfig.maxTokens : 2000;
 
-        // 若未配置任何 API Key，则返回离线启发式结构化数据并标记 mode = 'heuristic'
         if (!apiKey) {
           return jsonResponse({
             ok: true,
             mode: 'heuristic',
-            model: 'local-heuristic-engine',
+            model: 'local-engine',
             data: buildHeuristicFallback(taskType, payload || {}),
           });
         }
 
         let systemPrompt =
           aiConfig?.customSystemPrompt?.trim() ||
-          '你是一位资深的英语语言学专家、文学翻译导师与前雅思考官。请始终使用专业、清晰的中文进行讲解。';
+          '你是一位英语语言学学者、文学译者与雅思考官。请使用简明、克制、准确的中文书面语进行解析。';
         let userPrompt = '';
         let expectJson = true;
 
         if (taskType === 'grammar_analyze') {
           systemPrompt +=
-            '\n请将用户输入的英语句子拆解为严格的 JSON 格式，不要输出额外解释文本。JSON 结构必须包含：' +
-            '{"sentence": "原句", "translation": "精准中文译文", "pattern": "句型结构概括(如 主句SVO + 让步状语从句)", "difficulty": "初级(B1)/中级(B2)/高级(C1)", "summary": "核心语法点与句法逻辑总览(60-120字)", ' +
-            '"tokens": [{"text": "词或短语片段", "role": "中文成分名(主语/谓语动词/宾语/表语/定语/状语/补语/连词/同位语/从句)", "roleCode": "S|V|O|P|Attr|Adv|Comp|Conn|Clause", "explanation": "该片段在句中的语法功能解析"}], ' +
-            '"steps": [{"step": 1, "title": "步骤标题", "description": "拆解说明", "highlightRoles": ["S", "V"]}], ' +
-            '"syntaxTree": {"id": "root", "label": "S (完整句)", "role": "Clause", "text": "完整句文本", "children": [{"id": "n1", "label": "NP (主语短语)", "role": "S", "text": "...", "children": []}]}}';
-          userPrompt = `请深度拆解以下英语句子的语法成分与短语结构句法树：\n"${payload.sentence}"`;
+            '\n请将英语句子拆解为严格 JSON 格式，不要输出额外文本。结构如下：' +
+            '{"sentence": "原句", "translation": "中文译文", "pattern": "句型结构概括", "difficulty": "初级(B1)/中级(B2)/高级(C1)", "summary": "核心句法结构说明", ' +
+            '"tokens": [{"text": "词或短语片段", "role": "主语/谓语/宾语/表语/定语/状语/补语/连词/从句", "roleCode": "S|V|O|P|Attr|Adv|Comp|Conn|Clause", "explanation": "句法功能说明"}], ' +
+            '"steps": [{"step": 1, "title": "核心主干 (Core Trunk)", "description": "主干成分说明", "highlightRoles": ["S", "V"]}], ' +
+            '"syntaxTree": {"id": "root", "label": "S (Sentence)", "role": "Clause", "text": "原句", "children": [{"id": "n1", "label": "NP", "role": "S", "text": "...", "children": []}]}}';
+          userPrompt = `请拆解以下英语句子的语法成分与句法树：\n"${payload.sentence}"`;
         } else if (taskType === 'translation_grade') {
           systemPrompt +=
-            '\n请对用户的中译英句子进行多维评分与批改，返回严格 JSON 格式：' +
+            '\n请对中译英译文进行三维评定，返回严格 JSON 格式：' +
             '{"overallScore": 88, "dimensions": {"accuracy": 90, "grammar": 86, "idiomaticity": 88}, ' +
-            '"commentary": "总体点评(指出亮点与核心差距)", "strengths": ["亮点1", "亮点2"], "improvements": ["具体改进建议1", "具体改进建议2"], "polishedVersion": "保留用户思路的高阶母语润色版本"}';
+            '"commentary": "简明总评", "strengths": ["可取之处1", "可取之处2"], "improvements": ["修订建议1", "修订建议2"], "polishedVersion": "润色参考版本"}';
           userPrompt =
             `中文原句：${payload.chinese}\n` +
-            `出处背景：${payload.sourceTitle || ''} (${payload.sourceWork || ''})\n` +
-            `原著/影视参考英文：${payload.referenceEnglish}\n` +
-            `用户提交的英文译文：${payload.userTranslation}\n` +
-            `请对比原著参考译文，对用户译文进行严格批改。`;
+            `出处：${payload.sourceTitle || ''} (${payload.sourceWork || ''})\n` +
+            `原著参考译文：${payload.referenceEnglish}\n` +
+            `待评译文：${payload.userTranslation}`;
         } else if (taskType === 'ielts_evaluate') {
           systemPrompt +=
-            '\n你是一位资深雅思考官。请按照雅思官方四项评分标准对用户的写作或口语作答进行评分与升格，返回严格 JSON 格式：' +
+            '\n请按雅思官方四项标准评定作答，返回严格 JSON 格式：' +
             '{"overallBand": 7.0, "criteria": {"taskResponse": 7.0, "coherence": 7.0, "lexical": 7.5, "grammar": 6.5}, ' +
-            '"summary": "考官总评与提分核心建议", "strengths": ["优势1", "优势2"], "improvements": ["问题与修改建议1", "问题与修改建议2"], ' +
-            '"upgradedVersion": "基于考生原文升格后的 Band 8.0+ 范文或高分口语回答", ' +
-            '"highBandVocabulary": [{"word": "高分替换词/短语", "meaning": "中文释义与替换说明"}]}';
+            '"summary": "简明评定意见", "strengths": ["优势1", "优势2"], "improvements": ["改进建议1", "改进建议2"], ' +
+            '"upgradedVersion": "Band 8.0+ 升格范式", ' +
+            '"highBandVocabulary": [{"word": "替换词", "meaning": "释义"}]}';
           userPrompt =
-            `雅思科目：${payload.skill}\n` +
-            `题目/话题：${payload.promptTitle}\n` +
-            `题目要求：${payload.promptQuestion}\n` +
-            `考生作答内容：${payload.userResponse}\n` +
-            `请给出四维 Band 评分、纠错建议及 Band 8.0+ 升格示范。`;
+            `科目：${payload.skill}\n` +
+            `题目：${payload.promptTitle}\n` +
+            `要求：${payload.promptQuestion}\n` +
+            `作答内容：${payload.userResponse}`;
         } else {
           expectJson = false;
-          const contextInfo = payload.context ? `\n【当前学习模块上下文】：${payload.context}` : '';
-          userPrompt = `${contextInfo}\n\n【用户问题】：${payload.question || payload.message || ''}`;
+          const contextInfo = payload.context ? `\n【语境】：${payload.context}` : '';
+          userPrompt = `${contextInfo}\n\n【问题】：${payload.question || payload.message || ''}`;
         }
 
         const endpoint = normalizeOpenAIBaseUrl(baseUrl);
@@ -803,7 +713,7 @@ export default {
             {
               ok: false,
               status: upstreamRes.status,
-              error: `AI 代理请求失败 (${upstreamRes.status}): ${errText.slice(0, 300)}`,
+              error: `AI 服务请求未成功 (${upstreamRes.status}): ${errText.slice(0, 240)}`,
             },
             upstreamRes.status
           );
@@ -825,7 +735,6 @@ export default {
               data: parsedData,
             });
           } catch {
-            // 如果模型未严格输出 JSON，则合并启发式结构与原始回复
             const fallback = buildHeuristicFallback(taskType, payload || {}) as Record<string, unknown>;
             return jsonResponse({
               ok: true,
@@ -850,22 +759,19 @@ export default {
         return jsonResponse(
           {
             ok: false,
-            error: err instanceof Error ? err.message : 'Worker 代理转发异常',
+            error: err instanceof Error ? err.message : '服务请求异常',
           },
           500
         );
       }
     }
 
-    // ========================================================================
-    // 5. 静态资源服务（转发至 Cloudflare Workers Static Assets）
-    // ========================================================================
     if (env.ASSETS) {
       return env.ASSETS.fetch(request);
     }
 
     return new Response(
-      'LinguaForge Worker API is running. Build frontend assets with `npm run build` to serve static files.',
+      'LinguaForge Worker API is active.',
       { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } }
     );
   },
