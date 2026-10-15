@@ -4,6 +4,11 @@ main = "src/worker/index.ts"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
+# 自定义域名（部署时自动创建 DNS 记录与证书）
+[[routes]]
+pattern = "english.791860.xyz"
+custom_domain = true
+
 # 静态资源配置（Vite 构建产物目录，由 Cloudflare Workers Static Assets 托管）
 [assets]
 directory = "./dist/client"
@@ -21,7 +26,7 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "linguaforge-db"
-database_id = "00000000-0000-0000-0000-000000000000" # 部署生产环境前请替换为 `wrangler d1 create linguaforge-db` 生成的 ID
+database_id = "f56b81c6-34ff-41c0-a513-aa54d9162b59"
 
 # 如需使用 KV 替代 D1，可取消下方注释并填入 KV namespace id：
 # [[kv_namespaces]]

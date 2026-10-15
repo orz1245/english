@@ -2,6 +2,29 @@
 
 基于 **React 18 + Vite + TypeScript + Cloudflare Workers (Static Assets + D1/KV 持久化 + OpenAI 兼容代理转发)** 构建的全栈英语学习平台。
 
+## 线上地址与部署信息
+
+| 项目 | 值 |
+| --- | --- |
+| 线上地址 | https://english.791860.xyz |
+| 源码仓库 | https://github.com/orz1245/english （默认分支 `main`，推送即触发 CI） |
+| Worker 名称 | `linguaforge-english` |
+| 自定义域名 | `english.791860.xyz`（`wrangler.toml` 中 `[[routes]] custom_domain = true` 自动托管） |
+| D1 数据库 | `linguaforge-db` / `f56b81c6-34ff-41c0-a513-aa54d9162b59`（绑定名 `DB`） |
+
+常用命令：
+
+```bash
+npm install
+npm run typecheck          # 类型检查（CI 必过）
+npm run build              # 构建前端到 dist/client
+npx wrangler deploy        # 部署 Worker + 静态资源 + 自定义域名
+npx wrangler d1 execute linguaforge-db --remote --file=./schema.sql   # 初始化线上表结构与索引
+npx wrangler secret put DEFAULT_AI_API_KEY   # 可选：服务端默认 AI 密钥
+```
+
+GitHub Actions 自动部署需在仓库 Settings → Secrets 中配置 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`（未配置时部署步骤会自动跳过），可选 `CLOUDFLARE_D1_DATABASE_ID`、`DEFAULT_AI_API_KEY`。
+
 ---
 
 ## 一、核心功能架构

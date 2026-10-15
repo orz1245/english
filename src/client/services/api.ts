@@ -7,6 +7,12 @@ import {
   UserProgress,
 } from '../types';
 
+// workers-types 下 Response.json() 返回 unknown，统一在此断言为动态对象后再消费
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function readJson(res: Response): Promise<any> {
+  return await res.json();
+}
+
 const STORAGE_KEYS = {
   USER_ID: 'linguaforge_user_id',
   AI_CONFIG: 'linguaforge_ai_config',
@@ -91,7 +97,7 @@ export async function checkWorkerHealth(): Promise<CloudHealthInfo> {
       headers: { 'X-User-Id': getUserId() },
     });
     if (!res.ok) throw new Error('Health check failed');
-    return await res.json();
+    return await readJson(res);
   } catch {
     return {
       ok: false,
@@ -117,7 +123,7 @@ export async function syncStateFromCloud(): Promise<{
       headers: { 'X-User-Id': getUserId() },
     });
     if (!res.ok) throw new Error('State fetch failed');
-    const data = await res.json();
+    const data = await readJson(res);
 
     const mergedConfig: AIConfig =
       data.aiConfig && Object.keys(data.aiConfig).length > 0
@@ -185,7 +191,7 @@ export async function pushStateToCloud(
       body: JSON.stringify({ aiConfig, progress }),
     });
     if (!res.ok) throw new Error('Failed to push state');
-    return await res.json();
+    return await readJson(res);
   } catch {
     return {
       ok: true,
@@ -202,7 +208,7 @@ export async function fetchPracticeHistory(module?: string): Promise<PracticeRec
       headers: { 'X-User-Id': getUserId() },
     });
     if (!res.ok) throw new Error('History fetch failed');
-    const data = await res.json();
+    const data = await readJson(res);
     if (Array.isArray(data.records)) {
       return data.records;
     }
@@ -258,7 +264,7 @@ export async function savePracticeRecord(params: {
       body: JSON.stringify(params),
     });
     if (res.ok) {
-      const data = await res.json();
+      const data = await readJson(res);
       if (data.record) return data.record;
     }
   } catch {
@@ -285,7 +291,7 @@ export async function testAIProxyConnection(aiConfig: AIConfig): Promise<{
       },
       body: JSON.stringify({ aiConfig }),
     });
-    return await res.json();
+    return await readJson(res);
   } catch (err) {
     return {
       ok: false,
@@ -311,7 +317,7 @@ export async function analyzeSentenceWithAI(
     }),
   });
 
-  const json = await res.json();
+  const json = await readJson(res);
   if (!res.ok || !json.ok) {
     throw new Error(json.error || 'AI 句子语法拆解失败');
   }
@@ -370,7 +376,7 @@ export async function gradeTranslationWithAI(
     }),
   });
 
-  const json = await res.json();
+  const json = await readJson(res);
   if (!res.ok || !json.ok) {
     throw new Error(json.error || 'AI 翻译批改请求失败');
   }
@@ -405,7 +411,7 @@ export async function evaluateIeltsWithAI(
     }),
   });
 
-  const json = await res.json();
+  const json = await readJson(res);
   if (!res.ok || !json.ok) {
     throw new Error(json.error || 'AI 雅思评分请求失败');
   }
@@ -435,7 +441,7 @@ export async function askAITutor(
     }),
   });
 
-  const json = await res.json();
+  const json = await readJson(res);
   if (!res.ok || !json.ok) {
     throw new Error(json.error || 'AI 助教响应失败');
   }
